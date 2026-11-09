@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Fin-Fam</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f5c5c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fin-Fam">
+<style>
+:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c;--in:#1d7a4d;--out:#b4432f}
+@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9;--in:#58c58b;--out:#ef8a74}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font:700 1.4rem Georgia,serif;margin:0 0 12px}
+h2{font-size:1rem;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mnav b{text-transform:capitalize;font-size:1.05rem}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--main);color:#fff;border:0;border-radius:8px;padding:10px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--main);border:1px solid var(--line)}
+button.del{background:transparent;color:var(--out);padding:4px 8px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin:4px 0 12px}
+label{font-size:.9rem;color:var(--mute)}
+.big{font:700 2rem Georgia,serif}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.in{color:var(--in)}.out{color:var(--out)}.mute{color:var(--mute);font-size:.9rem}
+.bar{height:8px;background:var(--line);border-radius:4px;margin:4px 0 12px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--main)}
+.tx{padding:10px 0;border-bottom:1px solid var(--line)}
+.tx:last-child{border:0}
+.chk{display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
+.chk label{display:flex;align-items:center;gap:6px;color:var(--ink)}
+.chk input{width:auto;margin:0}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--mute);border-radius:0;padding:14px 4px;font-size:.85rem}
+nav button.on{color:var(--main);font-weight:700}
+.empty{text-align:center;color:var(--mute);padding:28px 8px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY='finfam-v1';
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.tx)S={members:[{id:'m1',name:'Io'},{id:'m2',name:'Partner'}],tx:[]};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const CO=['Casa','Spesa','Bollette','Trasporti','Salute','Scuola','Svago','Ristoranti','Abbonamenti','Altro'];
+const CI=['Stipendio','Altre entrate'];
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+let tab='home',month=today().slice(0,7);
+const eur=n=>n.toLocaleString('it-IT',{style:'currency',currency:'EUR'});
+const mName=m=>{const [y,mo]=m.split('-');return new Date(y,mo-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'})};
+const shift=d=>{const [y,m]=month.split('-').map(Number);const dt=new Date(y,m-1+d,1);month=dt.getFullYear()+'-'+pad(dt.getMonth()+1);render()};
+const nm=id=>(S.members.find(m=>m.id===id)||{name:'?'}).name;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const monthTx=()=>S.tx.filter(t=>t.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
+const mnav=()=>`<div class="mnav"><button class="ghost" onclick="shift(-1)">‹</button><b>${mName(month)}</b><button class="ghost" onclick="shift(1)">›</button></div>`;
+
+function home(){
+  const tx=monthTx(),inc=tx.filter(t=>t.type==='in').reduce((a,t)=>a+t.amount,0),
+  out=tx.filter(t=>t.type==='out').reduce((a,t)=>a+t.amount,0),cats={};
+  tx.filter(t=>t.type==='out').forEach(t=>cats[t.cat]=(cats[t.cat]||0)+t.amount);
+  const list=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  return `<h1>Fin-Fam</h1>${mnav()}
+  <div class="card"><div class="mute">Saldo del mese</div><div class="big ${inc-out<0?'out':'in'}">${eur(inc-out)}</div>
+  <div class="row" style="margin-top:8px"><span class="in">Entrate ${eur(inc)}</span><span class="out">Uscite ${eur(out)}</span></div></div>
+  <h2>Spese per categoria</h2><div class="card">${list.length?list.map(([c,v])=>`<div class="row"><span>${esc(c)}</span><span>${eur(v)}</span></div><div class="bar"><i style="width:${v/out*100}%"></i></div>`).join(''):'<div class="empty">Nessuna spesa questo mese.<br>Tocca “Aggiungi” per registrarne una.</div>'}</div>`;
+}
+
+function add(){
+  const m=S.members;
+  return `<h1>Aggiungi</h1><div class="card">
+  <label>Tipo</label><select id="f-type" onchange="setCats()"><option value="out">Spesa</option><option value="in">Entrata</option></select>
+  <label>Importo (€)</label><input id="f-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00">
+  <label>Categoria</label><select id="f-cat"></select>
+  <label>Data</label><input id="f-date" type="date" value="${today()}">
+  <label>Nota (facoltativa)</label><input id="f-note" placeholder="Es. spesa al supermercato">
+  <label>Chi ha pagato / incassato</label><select id="f-by">${m.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select>
+  <div id="sh-box"><label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="f-sh" type="checkbox" style="width:auto;margin:0" onchange="$('#sp').hidden=!this.checked"> Spesa condivisa</label>
+  <div id="sp" hidden style="margin-top:10px"><label>Da dividere in parti uguali tra:</label><div class="chk">${m.map(x=>`<label><input type="checkbox" class="sp" value="${x.id}" checked> ${esc(x.name)}</label>`).join('')}</div></div></div>
+  <button style="width:100%;margin-top:12px" onclick="addTx()">Salva</button></div>`;
+}
+function setCats(){
+  const t=$('#f-type').value;
+  $('#f-cat').innerHTML=(t==='in'?CI:CO).map(c=>`<option>${c}</option>`).join('');
+  $('#sh-box').hidden=t==='in';
+}
+function addTx(){
+  const amount=Math.round(parseFloat($('#f-amt').value.replace(',','.'))*100)/100;
+  if(!(amount>0)){alert('Inserisci un importo maggiore di zero.');return}
+  const type=$('#f-type').value,shared=type==='out'&&$('#f-sh').checked;
+  const split=shared?[...document.querySelectorAll('.sp:checked')].map(x=>x.value):[];
+  if(shared&&!split.length){alert('Scegli almeno una persona con cui dividere.');return}
+  S.tx.push({id:uid(),type,amount,cat:$('#f-cat').value,date:$('#f-date').value||today(),note:$('#f-note').value.trim(),by:$('#f-by').value,shared,split});
+  save();month=($('#f-date').value||today()).slice(0,7);tab='list';render();
+}
+
+function list(){
+  const tx=monthTx();
+  return `<h1>Movimenti</h1>${mnav()}<div class="card">${tx.length?tx.map(t=>{
+    const d=new Date(t.date+'T00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+    const label=t.type==='pay'?`Rimborso ${esc(nm(t.from))} → ${esc(nm(t.to))}`:esc(t.cat)+(t.note?' · '+esc(t.note):'');
+    const sub=t.type==='pay'?'':` · ${esc(nm(t.by))}${t.shared?' · condivisa':''}`;
+    const cls=t.type==='in'?'in':t.type==='out'?'out':'mute',sign=t.type==='in'?'+':t.type==='out'?'−':'';
+    return `<div class="tx row"><div><div>${label}</div><div class="mute">${d}${sub}</div></div><div class="row"><b class="${cls}">${sign}${eur(t.amount)}</b><button class="del" onclick="del('${t.id}')" aria-label="Elimina">✕</button></div></div>`}).join(''):'<div class="empty">Nessun movimento in questo mese.</div>'}</div>`;
+}
+function del(id){if(confirm('Eliminare questo movimento?')){S.tx=S.tx.filter(t=>t.id!==id);save();render()}}
+
+function balances(){
+  const net={};S.members.forEach(m=>net[m.id]=0);
+  S.tx.forEach(t=>{
+    if(t.type==='pay'){net[t.from]+=t.amount;net[t.to]-=t.amount}
+    else if(t.type==='out'&&t.shared&&t.split.length){net[t.by]+=t.amount;t.split.forEach(id=>net[id]-=t.amount/t.split.length)}
+  });
+  const cr=[],de=[];
+  Object.entries(net).forEach(([id,v])=>{v=Math.round(v*100)/100;if(v>0.009)cr.push([id,v]);else if(v<-0.009)de.push([id,-v])});
+  const pays=[];
+  while(cr.length&&de.length){
+    const a=Math.min(cr[0][1],de[0][1]);
+    pays.push({from:de[0][0],to:cr[0][0],amount:Math.round(a*100)/100});
+    cr[0][1]-=a;de[0][1]-=a;
+    if(cr[0][1]<0.01)cr.shift();if(de[0]&&de[0][1]<0.01)de.shift();
+  }
+  return {net,pays};
+}
+function shared(){
+  const {net,pays}=balances();
+  return `<h1>Spese condivise</h1><div class="card">${S.members.map(m=>`<div class="row"><span>${esc(m.name)}</span><b class="${net[m.id]>0.009?'in':net[m.id]<-0.009?'out':'mute'}">${net[m.id]>0.009?'deve ricevere ':net[m.id]<-0.009?'deve dare ':'in pari '}${Math.abs(net[m.id])>0.009?eur(Math.abs(net[m.id])):''}</b></div>`).join('')}</div>
+  <h2>Per pareggiare i conti</h2><div class="card">${pays.length?pays.map((p,i)=>`<div class="tx row"><span>${esc(nm(p.from))} paga ${eur(p.amount)} a ${esc(nm(p.to))}</span><button onclick="settle(${i})">Fatto</button></div>`).join(''):'<div class="empty">Tutto in pari.</div>'}</div>`;
+}
+function settle(i){const p=balances().pays[i];S.tx.push({id:uid(),type:'pay',amount:p.amount,from:p.from,to:p.to,date:today()});save();render()}
+
+function settings(){
+  return `<h1>Impostazioni</h1><div class="card"><h2 style="margin-top:0">Membri della famiglia</h2>
+  ${S.members.map(m=>`<input value="${esc(m.name)}" onchange="rename('${m.id}',this.value)">`).join('')}
+  <button class="ghost" onclick="addMember()">+ Aggiungi membro</button></div>
+  <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>`;
+}
+function rename(id,v){const m=S.members.find(x=>x.id===id);if(m&&v.trim()){m.name=v.trim();save()}}
+function addMember(){S.members.push({id:uid(),name:'Nuovo membro'});save();render()}
+function backup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='fin-fam-dati-'+today()+'.json';a.click()}
+
+const TABS=[['home','Riepilogo'],['add','Aggiungi'],['list','Movimenti'],['shared','Condivise'],['settings','Impostazioni']];
+function render(){
+  $('#app').innerHTML={home,add,list,shared,settings}[tab]();
+  $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render();scrollTo(0,0)">${l}</button>`).join('');
+  if(tab==='add')setCats();
+}
+render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
