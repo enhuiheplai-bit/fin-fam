@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fin-Fam">
 <style>
-:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c;--in:#1d7a4d;--out:#b4432f}
-@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9;--in:#58c58b;--out:#ef8a74}}
+:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c;--in:#1d7a4d;--out:#b4432f;--alt:#b7791f}
+@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9;--in:#58c58b;--out:#ef8a74;--alt:#e0a74a}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom))}
@@ -42,6 +42,13 @@ nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);b
 nav button{flex:1;background:none;color:var(--mute);border-radius:0;padding:14px 4px;font-size:.78rem}
 nav button.on{color:var(--main);font-weight:700}
 .empty{text-align:center;color:var(--mute);padding:28px 8px}
+.seg{display:flex;margin-bottom:12px}.seg button{flex:1;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:0}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}.seg button.on{background:var(--main);color:#fff;border-color:var(--main)}
+summary{list-style:none;cursor:pointer;padding:6px 0}summary::-webkit-details-marker{display:none}
+.ic{background:transparent;color:var(--main);padding:4px 7px}
+.leg{display:flex;gap:14px;font-size:.85rem;color:var(--mute);margin-bottom:4px}.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+table{border-collapse:collapse;width:100%;font-size:.8rem}th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+.pricebox{border-color:var(--main);border-width:2px}
+.leg{flex-wrap:wrap}.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.fgrid select{margin:0}
 </style>
 </head>
 <body>
@@ -55,18 +62,24 @@ let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.tx)S={tx:[]};
 if(!S.inv)S.inv=[];
+if(!S.pacs)S.pacs=['PAC1','PAC2'];
+if(!S.cash)S.cash=[];
+S.inv.forEach(a=>{if(!a.pac)a.pac=S.pacs[0]});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const GR=[
 ['Self',['🍲 SPESA','🍝 CIBO/FUORI','👚 ABBIGLIAMENTO','💻 HOBBY','💅 CURA PERSONALE','📖 ISTRUZIONE','🩺 SALUTE','🎁 REGALI','✈️ VIAGGI/VACANZE','📈 INVESTIMENTI','💸 TASSE']],
 ['Baby',['🍼 BABY/Care','🧷 BABY/Salute','🧦 BABY/Abbigliamento']],
 ['Casa',['💡 LUCE','🕯️ GAS','💧 ACQUA','📞 TELEFONO','🏠 CONDOMINIO','🏘️ CONDOMINIO AREA CORTILIVA','🗑️ TARI']],
 ['Trasporto',['🚗 Varie','🚗 AUTO_FORD_Altro','🚗 Auto_Moto_Carburante','🚗 Auto_Moto_Altro']]];
-const CI=['💼 Stipendio','➕ Altre entrate'];
+const CI=['Salary EH','Taxes EH','Salary ZX','Taxes ZX','Other EH&ZX','AUU MY'],TAX=['Taxes EH','Taxes ZX'];
+const isTax=c=>TAX.includes(c);
 const grpOf=c=>(GR.find(g=>g[1].includes(c))||['Altro'])[0];
+const MN=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
 const pad=n=>String(n).padStart(2,'0');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
-let tab='home',month=today().slice(0,7),iv={v:'list',id:null};
+let tab='home',hv='m',month=today().slice(0,7),yr=today().slice(0,4),iv={v:'list',id:null},ed=null;
 const eur=n=>n.toLocaleString('it-IT',{style:'currency',currency:'EUR'});
+const eur0=n=>n.toLocaleString('it-IT',{maximumFractionDigits:0})+' €';
 const sg=n=>(n>=0?'+':'−')+eur(Math.abs(n));
 const pct=n=>(n>=0?'+':'−')+Math.abs(n).toFixed(2).replace('.',',')+'%';
 const num=id=>parseFloat(($('#'+id).value||'').replace(',','.'));
@@ -74,135 +87,223 @@ const fd=d=>new Date(d+'T00:00').toLocaleDateString('it-IT',{day:'numeric',month
 const mName=m=>{const [y,mo]=m.split('-');return new Date(y,mo-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'})};
 const shift=d=>{const [y,m]=month.split('-').map(Number);const dt=new Date(y,m-1+d,1);month=dt.getFullYear()+'-'+pad(dt.getMonth()+1);render()};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const monthTx=()=>S.tx.filter(t=>t.type!=='pay'&&t.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
+const sum=(a,t)=>a+t.amount,byD=(x,y)=>x.date.localeCompare(y.date);
+const real=()=>S.tx.filter(t=>t.type!=='pay');
+const monthTx=()=>real().filter(t=>t.date.startsWith(month)).sort((a,b)=>byD(b,a));
+const nextM=d=>{const [y,m,dd]=d.split('-').map(Number),l=new Date(y,m+1,0).getDate(),t=new Date(y,m,Math.min(dd,l));return t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate())};
 const mnav=()=>`<div class="mnav"><button class="ghost" onclick="shift(-1)">‹</button><b>${mName(month)}</b><button class="ghost" onclick="shift(1)">›</button></div>`;
+const seg=()=>`<div class="seg"><button class="${hv==='m'?'on':''}" onclick="hv='m';render()">Mese</button><button class="${hv==='y'?'on':''}" onclick="hv='y';render()">Anno</button></div>`;
+const legend=(a,b,va,vb)=>`<div class="leg"><span><i style="background:var(--main)"></i>${a}${va?': <b>'+va+'</b>':''}</span><span><i style="background:var(--alt)"></i>${b}${vb?': <b>'+vb+'</b>':''}</span></div>`;
+const SPESA='🍲 SPESA';
+let F={q:'',y:today().slice(0,4),m:today().slice(5,7),d:'',g:'',c:'',t:''};
 
-function home(){
-  const tx=monthTx(),inc=tx.filter(t=>t.type==='in').reduce((a,t)=>a+t.amount,0),
-  out=tx.filter(t=>t.type==='out').reduce((a,t)=>a+t.amount,0),g={};
-  tx.filter(t=>t.type==='out').forEach(t=>{const k=grpOf(t.cat);g[k]=g[k]||{tot:0,c:{}};g[k].tot+=t.amount;g[k].c[t.cat]=(g[k].c[t.cat]||0)+t.amount});
-  const groups=Object.entries(g).sort((a,b)=>b[1].tot-a[1].tot);
-  return `<h1>Fin-Fam</h1>${mnav()}
-  <div class="card"><div class="mute">Saldo del mese</div><div class="big ${inc-out<0?'out':'in'}">${eur(inc-out)}</div>
-  <div class="row" style="margin-top:8px"><span class="in">Entrate ${eur(inc)}</span><span class="out">Uscite ${eur(out)}</span></div></div>
-  <h2>Spese per categoria</h2>${groups.length?groups.map(([n,x])=>`<div class="card"><div class="row"><b>${esc(n)}</b><b>${eur(x.tot)}</b></div><div style="height:8px"></div>${Object.entries(x.c).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="row"><span>${esc(c)}</span><span>${eur(v)}</span></div><div class="bar"><i style="width:${v/out*100}%"></i></div>`).join('')}</div>`).join(''):'<div class="card empty">Nessuna spesa questo mese.<br>Tocca “Aggiungi” per registrarne una.</div>'}`;
+/* ---------- grafici ---------- */
+function bars(items,na,nb,va,vb){
+  const W=340,H=170,pb=22,pt=16,pl=4,mx=Math.max(1,...items.flatMap(i=>[i.a,i.b])),n=items.length,gw=(W-pl*2)/n,bw=Math.min(24,gw/2-2),y=v=>pt+(H-pt-pb)*(1-v/mx);
+  const lab=(v,x)=>n<=4?`<text x="${x}" y="${y(v)-3}" font-size="8" text-anchor="middle" fill="var(--ink)">${eur0(v)}</text>`:'';
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><text x="${pl}" y="10" font-size="9" fill="var(--mute)">${eur0(mx)}</text><line x1="0" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="var(--line)"/>`;
+  items.forEach((it,i)=>{const cx=pl+gw*i+gw/2;
+    s+=`<rect x="${cx-bw-1}" y="${y(it.a)}" width="${bw}" height="${H-pb-y(it.a)}" fill="var(--main)" rx="2"><title>${esc(it.l)} · ${na}: ${eur(it.a)}</title></rect><rect x="${cx+1}" y="${y(it.b)}" width="${bw}" height="${H-pb-y(it.b)}" fill="var(--alt)" rx="2"><title>${esc(it.l)} · ${nb}: ${eur(it.b)}</title></rect>${lab(it.a,cx-bw/2-1)}${lab(it.b,cx+bw/2+1)}<text x="${cx}" y="${H-8}" font-size="9" text-anchor="middle" fill="var(--mute)">${esc(it.l)}</text>`});
+  return legend(na,nb,va,vb)+s+'</svg>';
+}
+function lines(p,na,nb){
+  if(!p.length)return '<div class="empty">Nessun dato da mostrare.</div>';
+  const W=340,H=150,pl=4,pb=18,pt=14,t0=Date.parse(p[0].d),t1=Date.parse(p[p.length-1].d),vs=p.flatMap(x=>[x.a,x.b]),mn=Math.min(...vs),mx=Math.max(...vs),L=p[p.length-1];
+  const x=d=>p.length<2||t1===t0?W/2:pl+8+(Date.parse(d)-t0)/(t1-t0)*(W-pl*2-16),y=v=>pt+(H-pt-pb)*(1-(mx===mn?.5:(v-mn)/(mx-mn)));
+  const pa=k=>p.map(q=>x(q.d).toFixed(1)+','+y(q[k]).toFixed(1)).join(' ');
+  const dots=(k,c)=>p.map(q=>`<circle cx="${x(q.d).toFixed(1)}" cy="${y(q[k]).toFixed(1)}" r="3" fill="${c}"><title>${fd(q.d)} · ${eur(q[k])}</title></circle>`).join('');
+  const an=p.length>1?'end':'middle',lx=x(L.d)-(p.length>1?4:0),up=L.a>=L.b;
+  const tl=(v,c,dy)=>`<text x="${lx}" y="${(y(v)+dy).toFixed(1)}" font-size="9" font-weight="700" text-anchor="${an}" fill="${c}">${eur0(v)}</text>`;
+  return legend(na,nb,eur0(L.a),eur0(L.b))+`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><text x="${pl}" y="9" font-size="9" fill="var(--mute)">${eur0(mx)}</text><text x="${pl}" y="${H-pb-3}" font-size="9" fill="var(--mute)">${eur0(mn)}</text><line x1="0" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="var(--line)"/>
+  <polyline points="${pa('b')}" fill="none" stroke="var(--alt)" stroke-width="2"/><polyline points="${pa('a')}" fill="none" stroke="var(--main)" stroke-width="2"/>${dots('b','var(--alt)')}${dots('a','var(--main)')}${tl(L.a,'var(--main)',up?-6:12)}${tl(L.b,'var(--alt)',up?12:-6)}
+  <text x="${pl}" y="${H-4}" font-size="9" fill="var(--mute)">${fd(p[0].d)}</text><text x="${W-pl}" y="${H-4}" font-size="9" text-anchor="end" fill="var(--mute)">${fd(L.d)}</text></svg>`;
 }
 
+/* ---------- riepilogo ---------- */
+function txRow(t){
+  const s=t.type==='in'&&!isTax(t.cat)?1:-1,bp=t.bp?` · 🎟 buoni ${eur(t.bpv)} + resto ${eur(t.bpr)}`:'';
+  return `<div class="tx row"><div><div>${esc(t.cat)}${t.note?' · '+esc(t.note):''}</div><div class="mute">${fd(t.date)}${bp}</div></div><div class="row"><b class="${s>0?'in':'out'}">${s>0?'+':'−'}${eur(t.amount)}</b><button class="ic" onclick="openForm('${t.id}','edit')" aria-label="Modifica">✎</button><button class="ic" onclick="openForm('${t.id}','dup')" aria-label="Duplica nel mese successivo">⧉</button><button class="del" onclick="del('${t.id}')" aria-label="Elimina">✕</button></div></div>`;
+}
+const split=tx=>{const ins=tx.filter(t=>t.type==='in'),gross=ins.filter(t=>!isTax(t.cat)).reduce(sum,0),tax=ins.filter(t=>isTax(t.cat)).reduce(sum,0);return{ins,gross,tax,net:gross-tax,outs:tx.filter(t=>t.type==='out'),out:tx.filter(t=>t.type==='out').reduce(sum,0)}};
+function home(){return `<h1>Fin-Fam</h1>${seg()}${hv==='y'?yearView():monthView()}`}
+function monthView(){
+  const {ins,gross,tax,net,outs,out}=split(monthTx()),g={},bpTot=outs.reduce((a,t)=>a+(t.bp?t.bpv:0),0);
+  outs.forEach(t=>{const k=grpOf(t.cat);g[k]=g[k]||{tot:0,c:{}};g[k].tot+=t.amount;(g[k].c[t.cat]=g[k].c[t.cat]||[]).push(t)});
+  return `${mnav()}<div class="card"><div class="mute">Saldo del mese</div><div class="big ${net-out<0?'out':'in'}">${eur(net-out)}</div>
+  <div class="row" style="margin-top:8px"><span class="in">Entrate nette ${eur(net)}</span><span class="out">Uscite ${eur(out)}</span></div>
+  ${tax?`<div class="mute" style="margin-top:4px">Lordo ${eur(gross)} · Tasse ${eur(tax)}</div>`:''}${bpTot?`<div class="mute">🎟 Buoni pasto usati: ${eur(bpTot)}</div>`:''}</div>
+  ${ins.length?`<details class="card"><summary class="row"><b>Entrate</b><b class="in">${eur(net)} ▾</b></summary>${ins.map(txRow).join('')}</details>`:''}
+  <h2>Spese per categoria</h2>${Object.keys(g).length?Object.entries(g).sort((a,b)=>b[1].tot-a[1].tot).map(([n,x])=>`<div class="card"><div class="row"><b>${esc(n)}</b><b>${eur(x.tot)}</b></div><div style="height:8px"></div>${Object.entries(x.c).sort((a,b)=>b[1].reduce(sum,0)-a[1].reduce(sum,0)).map(([c,l])=>{const v=l.reduce(sum,0);return `<details><summary class="row"><span>${esc(c)} ▾</span><span>${eur(v)}</span></summary>${l.map(txRow).join('')}</details><div class="bar"><i style="width:${v/out*100}%"></i></div>`}).join('')}</div>`).join(''):'<div class="card empty">Nessuna spesa questo mese.<br>Tocca “Aggiungi” per registrarne una.</div>'}`;
+}
+function yearView(){
+  const rows=[];
+  for(let m=1;m<=12;m++){const tx=real().filter(t=>t.date.startsWith(yr+'-'+pad(m))),s=split(tx);rows.push({m,net:s.net,out:s.out,tx:s.outs})}
+  const T=rows.reduce((a,r)=>({net:a.net+r.net,out:a.out+r.out}),{net:0,out:0}),names=[...GR.map(g=>g[0]),'Altro'];
+  return `<div class="mnav"><button class="ghost" onclick="yr=String(+yr-1);render()">‹</button><b>${yr}</b><button class="ghost" onclick="yr=String(+yr+1);render()">›</button></div>
+  <div class="card"><div class="mute">Saldo dell’anno</div><div class="big ${T.net-T.out<0?'out':'in'}">${eur(T.net-T.out)}</div><div class="row" style="margin-top:8px"><span class="in">Entrate nette ${eur(T.net)}</span><span class="out">Uscite ${eur(T.out)}</span></div></div>
+  <h2>Entrate nette e uscite per mese</h2><div class="card">${bars(rows.map(r=>({l:MN[r.m-1],a:Math.max(0,r.net),b:r.out})),'Entrate nette','Uscite','anno '+eur0(T.net),'anno '+eur0(T.out))}</div>
+  <h2>Andamento mensile</h2><div class="card" style="overflow-x:auto"><table><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Saldo</th></tr>
+  ${rows.map(r=>`<tr onclick="month='${yr}-${pad(r.m)}';hv='m';render()" style="cursor:pointer"><td>${MN[r.m-1]}</td><td>${eur0(r.net)}</td><td>${eur0(r.out)}</td><td class="${r.net-r.out<0?'out':'in'}">${eur0(r.net-r.out)}</td></tr>`).join('')}
+  <tr><th>Totale</th><th>${eur0(T.net)}</th><th>${eur0(T.out)}</th><th>${eur0(T.net-T.out)}</th></tr></table><div class="mute" style="margin-top:6px">Tocca un mese per aprirlo.</div></div>
+  <h2>Uscite per gruppo e mese</h2><div class="card" style="overflow-x:auto"><table><tr><th></th>${MN.map(m=>`<th>${m}</th>`).join('')}<th>Tot.</th></tr>
+  ${names.map(n=>{const c=rows.map(r=>r.tx.filter(t=>grpOf(t.cat)===n).reduce(sum,0)),t=c.reduce((a,b)=>a+b,0);return t?`<tr><td>${n}</td>${c.map(v=>`<td>${v?eur0(v).replace(' €',''):'–'}</td>`).join('')}<th>${eur0(t).replace(' €','')}</th></tr>`:''}).join('')}</table><div class="mute" style="margin-top:6px">Importi in euro.</div></div>`;
+}
+
+/* ---------- aggiungi / modifica / duplica ---------- */
+function openForm(id,mode){ed={id,mode};tab='add';render();scrollTo(0,0)}
 function add(){
-  return `<h1>Aggiungi</h1><div class="card">
+  const t=ed&&S.tx.find(x=>x.id===ed.id),title=!t?'Aggiungi':ed.mode==='edit'?'Modifica voce':'Duplica voce';
+  return `<h1>${title}</h1>${t&&ed.mode==='dup'?'<p class="mute" style="margin-top:-6px">Copia nel mese successivo: controlla importo e data, poi salva.</p>':''}<div class="card">
   <label>Tipo</label><select id="f-type" onchange="setCats()"><option value="out">Spesa</option><option value="in">Entrata</option></select>
-  <label>Importo (€)</label><input id="f-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00">
-  <label>Categoria</label><select id="f-cat"></select>
-  <label>Data</label><input id="f-date" type="date" value="${today()}">
-  <label>Nota (facoltativa)</label><input id="f-note" placeholder="Es. spesa al supermercato">
-  <button style="width:100%;margin-top:8px" onclick="addTx()">Salva</button></div>`;
+  <label>Importo (€)</label><input id="f-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" value="${t?t.amount:''}">
+  <label>Categoria</label><select id="f-cat" onchange="catChg()"></select>
+  <div id="f-hint" class="mute" hidden style="margin:-6px 0 12px">Salary = stipendio lordo. Taxes = tutte le trattenute della busta paga (vengono sottratte dalle entrate).</div>
+  <div id="f-bp" hidden style="margin-bottom:12px"><label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="f-bpc" type="checkbox" style="width:auto;margin:0" onchange="bpTog()"> Pagata con buoni pasto</label>
+  <div id="f-bpf" hidden style="margin-top:10px"><label>Importo pagato con i buoni pasto (€)</label><input id="f-bpv" type="number" inputmode="decimal" step="0.01" min="0" oninput="bpSum()" value="${t&&t.bp?t.bpv:''}">
+  <label>Importo residuo, pagato con altri mezzi (€)</label><input id="f-bpr" type="number" inputmode="decimal" step="0.01" min="0" oninput="bpSum()" value="${t&&t.bp?t.bpr:''}">
+  <div>Totale spesa: <b id="f-bpt"></b></div></div></div>
+  <label>Data</label><input id="f-date" type="date" value="${t?(ed.mode==='dup'?nextM(t.date):t.date):today()}">
+  <label>Nota (facoltativa)</label><input id="f-note" placeholder="Es. bolletta telefono" value="${t?esc(t.note||''):''}">
+  <button style="width:100%;margin-top:8px" onclick="addTx()">Salva</button>${t?`<button class="ghost" style="width:100%;margin-top:8px" onclick="ed=null;tab='home';render()">Annulla</button>`:''}</div>`;
 }
 function setCats(){
   const t=$('#f-type').value;
   $('#f-cat').innerHTML=t==='in'?CI.map(c=>`<option>${c}</option>`).join(''):GR.map(([n,l])=>`<optgroup label="${n}">${l.map(c=>`<option>${c}</option>`).join('')}</optgroup>`).join('');
+  catChg();
 }
 function addTx(){
-  const amount=Math.round(num('f-amt')*100)/100;
+  const type=$('#f-type').value,cat=$('#f-cat').value,bp=type==='out'&&cat===SPESA&&$('#f-bpc').checked;
+  let amount=Math.round(num('f-amt')*100)/100,bpv=0,bpr=0;
+  if(bp){bpv=Math.round((num('f-bpv')||0)*100)/100;bpr=Math.round((num('f-bpr')||0)*100)/100;amount=Math.round((bpv+bpr)*100)/100}
   if(!(amount>0)){alert('Inserisci un importo maggiore di zero.');return}
-  const date=$('#f-date').value||today();
-  S.tx.push({id:uid(),type:$('#f-type').value,amount,cat:$('#f-cat').value,date,note:$('#f-note').value.trim()});
-  save();month=date.slice(0,7);tab='list';render();
+  const date=$('#f-date').value||today(),d={type,amount,cat,date,note:$('#f-note').value.trim(),bp,bpv,bpr};
+  const t=ed&&ed.mode==='edit'&&S.tx.find(x=>x.id===ed.id);
+  if(t)Object.assign(t,d);else S.tx.push({id:uid(),...d});
+  save();month=date.slice(0,7);F={q:'',y:date.slice(0,4),m:date.slice(5,7),d:'',g:'',c:'',t:''};tab=ed?'home':'list';hv='m';ed=null;render();
 }
-
 function list(){
-  const tx=monthTx();
-  return `<h1>Movimenti</h1>${mnav()}<div class="card">${tx.length?tx.map(t=>{
-    const cls=t.type==='in'?'in':'out',sign=t.type==='in'?'+':'−';
-    return `<div class="tx row"><div><div>${esc(t.cat)}${t.note?' · '+esc(t.note):''}</div><div class="mute">${fd(t.date)}</div></div><div class="row"><b class="${cls}">${sign}${eur(t.amount)}</b><button class="del" onclick="del('${t.id}')" aria-label="Elimina">✕</button></div></div>`}).join(''):'<div class="empty">Nessun movimento in questo mese.</div>'}</div>`;
+  const ys=[...new Set([...real().map(t=>t.date.slice(0,4)),today().slice(0,4)])].sort().reverse(),
+  o=(v,l,sel)=>`<option value="${esc(v)}" ${sel?'selected':''}>${esc(l)}</option>`,
+  gs=['Entrate',...GR.map(g=>g[0]),'Altro'],
+  cs=F.g==='Entrate'?CI:F.g?(GR.find(g=>g[0]===F.g)||[0,[]])[1]:[...GR.flatMap(g=>g[1]),...CI];
+  return `<h1>Movimenti</h1><div class="card"><input id="f-q" type="search" placeholder="🔍 Cerca testo, categoria, importo…" value="${esc(F.q)}" oninput="fq(this.value)" style="margin-bottom:8px">
+  <div class="fgrid"><select onchange="setF('y',this.value)">${o('','Tutti gli anni',!F.y)}${ys.map(y=>o(y,y,F.y===y)).join('')}</select>
+  <select onchange="setF('m',this.value)">${o('','Tutti i mesi',!F.m)}${MN.map((m,i)=>o(pad(i+1),m,F.m===pad(i+1))).join('')}</select>
+  <select onchange="setF('d',this.value)">${o('','Tutti i giorni',!F.d)}${Array.from({length:31},(_,i)=>o(pad(i+1),i+1,F.d===pad(i+1))).join('')}</select>
+  <select onchange="setF('t',this.value)">${o('','Spese ed entrate',!F.t)}${o('out','Solo spese',F.t==='out')}${o('in','Solo entrate',F.t==='in')}</select>
+  <select onchange="setF('g',this.value)">${o('','Tutti i gruppi',!F.g)}${gs.map(g=>o(g,g,F.g===g)).join('')}</select>
+  <select onchange="setF('c',this.value)">${o('','Tutte le categorie',!F.c)}${cs.map(c=>o(c,c,F.c===c)).join('')}</select></div>
+  <button class="ghost" onclick="clrF()">Azzera filtri</button></div><div id="res">${resHtml()}</div>`;
 }
 function del(id){if(confirm('Eliminare questo movimento?')){S.tx=S.tx.filter(t=>t.id!==id);save();render()}}
 
-/* ---------- Investimenti ---------- */
+/* ---------- investimenti ---------- */
 const fac=a=>a.kind==='BTP'?0.01:1;
 function series(a){
   const m={};
-  a.ops.filter(o=>o.type!=='div').forEach(o=>m[o.date]=o.price);
-  (a.prices||[]).forEach(p=>m[p.date]=p.price);
-  return Object.entries(m).sort((x,y)=>x[0].localeCompare(y[0])).map(([date,price])=>({date,price}));
+  a.ops.filter(o=>o.type!=='div').forEach(o=>m[o.date]={price:o.price,src:o.type==='buy'?'acquisto':'vendita'});
+  (a.prices||[]).forEach(p=>m[p.date]={price:p.price,src:'m'});
+  return Object.entries(m).sort((x,y)=>x[0].localeCompare(y[0])).map(([date,v])=>({date,...v}));
 }
-function calc(a){
-  let q=0,cost=0,real=0,inc=0;
-  [...a.ops].sort((x,y)=>x.date.localeCompare(y.date)).forEach(o=>{
+function pos(a,d='9999-12-31'){
+  let q=0,cost=0,real=0,inc=0,incG=0,incT=0;
+  [...a.ops].filter(o=>o.date<=d).sort(byD).forEach(o=>{
     if(o.type==='buy'){cost+=o.qty*o.price*fac(a)+(o.fee||0);q+=o.qty}
     else if(o.type==='sell'){const avg=q?cost/q:0;real+=o.qty*o.price*fac(a)-(o.fee||0)-avg*o.qty;cost-=avg*o.qty;q-=o.qty}
-    else inc+=o.amount});
+    else{inc+=o.amount;incG+=(o.gross!=null?o.gross:o.amount);incT+=(o.tax||0)}});
   if(q<1e-9){q=0;cost=0}
-  const pts=series(a),last=pts[pts.length-1],prev=pts[pts.length-2],price=last?last.price:0,value=q*price*fac(a);
-  return {q,cost,real,inc,price,value,pl:value-cost,pts,last,prev,avg:q?cost/q/fac(a):0};
+  return {q,cost,real,inc,incG,incT};
 }
-function spark(p){
-  if(p.length<2)return '';
-  const v=p.map(x=>x.price),mn=Math.min(...v),mx=Math.max(...v),W=300,H=50;
-  const pts=v.map((y,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-(mx===mn?H/2:(y-mn)/(mx-mn)*(H-6)+3)).toFixed(1)}`).join(' ');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:50px"><polyline points="${pts}" fill="none" stroke="var(--main)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+function calc(a){
+  const p=pos(a),pts=series(a),last=pts[pts.length-1],prev=pts[pts.length-2],price=last?last.price:0,value=p.q*price*fac(a);
+  return {...p,price,value,pl:value-p.cost,pts,last,prev,avg:p.q?p.cost/p.q/fac(a):0};
 }
-const vari=c=>c.prev?`<span class="${c.last.price>=c.prev.price?'in':'out'}">${pct((c.last.price/c.prev.price-1)*100)}</span> <span class="mute">da ${fd(c.prev.date)}</span>`:'<span class="mute">prezzo da aggiornare</span>';
+function timeline(as){
+  const ds=[...new Set(as.flatMap(a=>[...a.ops.map(o=>o.date),...(a.prices||[]).map(p=>p.date)]))].sort();
+  return ds.map(d=>{let v=0,c=0;as.forEach(a=>{const p=pos(a,d),s=series(a).filter(x=>x.date<=d),pr=s.length?s[s.length-1].price:0;v+=p.q*pr*fac(a);c+=p.cost});return {d,a:v,b:c}});
+}
+const vari=c=>c.prev?`<span class="${c.last.price>=c.prev.price?'in':'out'}">${pct((c.last.price/c.prev.price-1)*100)}</span> <span class="mute">da ${fd(c.prev.date)}</span>`:'<span class="mute">nessuna variazione ancora</span>';
+const srcTag=c=>!c.last?'<span class="mute">nessun prezzo</span>':c.last.src==='m'?`<span class="in">✔ aggiornato a mano il ${fd(c.last.date)}</span>`:`<span class="out">⚠ da ${c.last.src} del ${fd(c.last.date)}</span>`;
 
 function invest(){
   if(iv.v==='form')return invForm();
   if(iv.v==='det')return invDet();
-  const rows=S.inv.map(a=>({a,c:calc(a)}));
-  const val=rows.reduce((s,r)=>s+r.c.value,0),cost=rows.reduce((s,r)=>s+r.c.cost,0),got=rows.reduce((s,r)=>s+r.c.real+r.c.inc,0),pl=val-cost;
+  if(iv.v==='cash')return cashView();
+  if(iv.v==='cform')return cashForm();
+  const rows=S.inv.map(a=>({a,c:calc(a)})),tot=rs=>({v:rs.reduce((s,r)=>s+r.c.value,0),c:rs.reduce((s,r)=>s+r.c.cost,0),g:rs.reduce((s,r)=>s+r.c.real+r.c.inc,0)});
+  const T=tot(rows),pl=T.v-T.c,LQ=S.pacs.reduce((s,p)=>s+cashBal(p),0);
   return `<h1>Investimenti</h1>
-  <div class="card"><div class="mute">Valore attuale</div><div class="big">${eur(val)}</div>
-  <div class="row"><span class="mute">Investito ${eur(cost)}</span><b class="${pl>=0?'in':'out'}">${sg(pl)} (${pct(cost?pl/cost*100:0)})</b></div>
-  <div class="mute" style="margin-top:6px">Già incassato (vendite e cedole): ${sg(got)}</div></div>
-  <button style="width:100%;margin-bottom:12px" onclick="iv={v:'form',id:null};render()">+ Registra operazione</button>
-  ${rows.length?rows.map(({a,c})=>`<div class="card" style="cursor:pointer" onclick="iv={v:'det',id:'${a.id}'};render()">
+  <div class="card"><div class="mute">Controvalore titoli famiglia</div><div class="big">${eur(T.v)}</div>
+  <div class="row"><span class="mute">Prezzo pagato ${eur(T.c)}</span><b class="${pl>=0?'in':'out'}">${sg(pl)} (${pct(T.c?pl/T.c*100:0)})</b></div>
+  <div class="row" style="margin-top:6px"><span>Liquidità ${eur(LQ)}</span><b>Patrimonio ${eur(T.v+LQ)}</b></div>
+  <div class="mute" style="margin-top:6px">Già incassato (vendite e cedole nette): ${sg(T.g)}</div></div>
+  <h2>Riepilogo per PAC</h2><div class="card">${bars([...S.pacs.map(p=>{const t=tot(rows.filter(r=>r.a.pac===p));return {l:p,a:t.v,b:t.c}}),{l:'Totale',a:T.v,b:T.c}],'Controvalore','Prezzo pagato','Totale '+eur0(T.v),'Totale '+eur0(T.c))}</div>
+  <h2>Andamento totale famiglia</h2><div class="card">${lines(timeline(S.inv),'Controvalore','Prezzo pagato')}</div>
+  <div class="row" style="gap:8px;margin:4px 0 12px"><button style="flex:1" onclick="iv={v:'form',id:null};render()">+ Operazione titolo</button><button class="ghost" style="flex:1" onclick="iv={v:'cform',pi:null};render()">+ Liquidità / FEE</button></div>
+  ${S.pacs.map((p,i)=>{const rs=rows.filter(r=>r.a.pac===p),t=tot(rs),b=cashBal(p);return `<h2>${esc(p)} · titoli ${eur(t.v)} <span class="${t.v-t.c>=0?'in':'out'}">${sg(t.v-t.c)}</span></h2>
+  <div class="card" style="cursor:pointer" onclick="iv={v:'cash',pi:${i}};render()"><div class="row"><span>💶 Liquidità disponibile</span><b class="${b<-0.005?'out':''}">${eur(b)}</b></div><div class="mute">Tocca per bonifici, FEE e movimenti${b<-0.005?' · ⚠ negativa':''}</div></div>
+  ${rs.length?rs.map(({a,c})=>`<div class="card" style="cursor:pointer" onclick="iv={v:'det',id:'${a.id}'};render()">
   <div class="row"><b>${esc(a.name)}</b><span class="mute">${esc(a.kind)}</span></div>
   <div class="row" style="margin-top:6px"><span class="mute">${c.q?`${c.q.toLocaleString('it-IT')} ${a.kind==='BTP'?'€ nominali':'quote'}`:'Posizione chiusa'}</span><b>${eur(c.value)}</b></div>
-  <div class="row"><span>${c.last?eur(c.price)+' '+vari(c):'—'}</span>${c.q?`<b class="${c.pl>=0?'in':'out'}">${sg(c.pl)}</b>`:''}</div></div>`).join(''):'<div class="card empty">Nessun titolo. Tocca “Registra operazione” per inserire il primo acquisto.</div>'}`;
+  <div class="row"><span>${c.last?'Prezzo '+eur(c.price):'—'}</span>${c.q?`<b class="${c.pl>=0?'in':'out'}">${sg(c.pl)}</b>`:''}</div><div style="font-size:.85rem">${srcTag(c)}</div></div>`).join(''):'<div class="card empty">Nessun titolo in questo PAC.</div>'}`}).join('')}`;
 }
 function invDet(){
   const a=S.inv.find(x=>x.id===iv.id);if(!a){iv={v:'list'};return invest()}
-  const c=calc(a),ops=[...a.ops].sort((x,y)=>y.date.localeCompare(x.date));
+  const c=calc(a),ops=[...a.ops].sort((x,y)=>byD(y,x));
   const R=(l,v)=>`<div class="row" style="padding:4px 0"><span class="mute">${l}</span><span>${v}</span></div>`;
   return `<button class="ghost" onclick="iv={v:'list'};render()">‹ Indietro</button>
   <h1 style="margin-top:12px">${esc(a.name)} <span class="mute" style="font:400 .9rem system-ui">${esc(a.kind)}</span></h1>
-  <div class="card">${R(a.kind==='BTP'?'Valore nominale':'Quote',c.q.toLocaleString('it-IT'))}
+  <div class="card pricebox"><div class="mute">Ultimo prezzo${a.kind==='BTP'?' (ogni 100 €)':''}</div><div class="big">${c.last?eur(c.price):'—'}</div>
+  <div>${srcTag(c)}</div>${c.last&&c.last.src!=='m'?'<div class="mute">Questo prezzo non è stato aggiornato: il controvalore usa l’ultimo prezzo di compravendita.</div>':''}
+  <div style="margin-top:6px">${vari(c)}</div><button style="width:100%;margin-top:10px" onclick="updPrice('${a.id}')">Aggiorna prezzo</button></div>
+  <div class="card">${R('PAC',`<select style="width:auto;margin:0" onchange="setPac('${a.id}',this.value)">${S.pacs.map(p=>`<option ${p===a.pac?'selected':''}>${esc(p)}</option>`).join('')}</select>`)}
+  ${R(a.kind==='BTP'?'Valore nominale':'Quote',c.q.toLocaleString('it-IT'))}
   ${R('Prezzo medio di carico',c.q?eur(c.avg):'—')}
-  ${R('Prezzo attuale'+(c.last?' ('+fd(c.last.date)+')':''),c.last?eur(c.price):'—')}
-  ${R('Variazione',vari(c))}
-  ${R('Valore attuale',eur(c.value))}
+  ${R('Prezzo pagato',eur(c.cost))}
+  ${R('Controvalore',eur(c.value))}
   ${R('Utile/perdita latente',c.q?`<b class="${c.pl>=0?'in':'out'}">${sg(c.pl)} (${pct(c.cost?c.pl/c.cost*100:0)})</b>`:'—')}
   ${R('Realizzato con vendite',sg(c.real))}
-  ${R('Cedole / dividendi',eur(c.inc))}
-  <div style="margin-top:10px">${spark(c.pts)}</div></div>
-  <div class="row" style="gap:8px;margin-bottom:12px"><button style="flex:1" onclick="updPrice('${a.id}')">Aggiorna prezzo</button><button class="ghost" style="flex:1" onclick="iv={v:'form',id:'${a.id}'};render()">+ Operazione</button></div>
-  <h2>Operazioni</h2><div class="card">${ops.map(o=>`<div class="tx row"><div><div>${o.type==='buy'?'Acquisto':o.type==='sell'?'Vendita':'Cedola/dividendo'}${o.type==='div'?'':' · '+o.qty.toLocaleString('it-IT')+' a '+eur(o.price)}</div><div class="mute">${fd(o.date)}${o.fee?' · comm. '+eur(o.fee):''}</div></div><div class="row"><b>${o.type==='div'?eur(o.amount):eur(o.qty*o.price*fac(a))}</b><button class="del" onclick="delOp('${a.id}','${o.id}')" aria-label="Elimina">✕</button></div></div>`).join('')||'<div class="empty">Nessuna operazione.</div>'}</div>
+  ${R('Cedole lorde',eur(c.incG))}${R('Tasse sulle cedole','−'+eur(c.incT))}${R('<b>Cedole nette</b>','<b>'+eur(c.inc)+'</b>')}</div>
+  <h2>Controvalore e prezzo pagato</h2><div class="card">${lines(timeline([a]),'Controvalore','Prezzo pagato')}</div>
+  <button class="ghost" style="width:100%;margin:12px 0" onclick="iv={v:'form',id:'${a.id}'};render()">+ Operazione su questo titolo</button>
+  <h2>Operazioni</h2><div class="card">${ops.map(o=>`<div class="tx row"><div><div>${o.type==='buy'?'Acquisto':o.type==='sell'?'Vendita':'Cedola netta'}${o.type==='div'?'':' · '+o.qty.toLocaleString('it-IT')+' a '+eur(o.price)}</div><div class="mute">${fd(o.date)}${o.type==='div'?' · lorda '+eur(o.gross!=null?o.gross:o.amount)+' − tasse '+eur(o.tax||0):o.fee?' · comm. '+eur(o.fee):''}${o.cash===false?' · fuori liquidità':''}</div></div><div class="row"><b>${o.type==='div'?eur(o.amount):eur(o.qty*o.price*fac(a))}</b><button class="del" onclick="delOp('${a.id}','${o.id}')" aria-label="Elimina">✕</button></div></div>`).join('')||'<div class="empty">Nessuna operazione.</div>'}</div>
   <button class="ghost" style="width:100%;color:var(--out)" onclick="delAsset('${a.id}')">Elimina questo titolo</button>`;
 }
 function invForm(){
   return `<button class="ghost" onclick="iv={v:iv.id?'det':'list',id:iv.id};render()">‹ Indietro</button><h1 style="margin-top:12px">Registra operazione</h1><div class="card">
-  <label>Titolo</label><select id="i-a" onchange="invTog()">${S.inv.map(a=>`<option value="${a.id}" ${a.id===iv.id?'selected':''}>${esc(a.name)}</option>`).join('')}<option value="new" ${S.inv.length?'':'selected'}>➕ Nuovo titolo…</option></select>
-  <div id="i-new"><label>Nome del titolo</label><input id="i-n" placeholder="Es. BTP Italia 2030 / VWCE"><label>Tipo</label><select id="i-k"><option>ETF</option><option>BTP</option><option>Azione</option><option>Altro</option></select></div>
+  <label>Titolo</label><select id="i-a" onchange="invTog()">${S.inv.map(a=>`<option value="${a.id}" ${a.id===iv.id?'selected':''}>${esc(a.name)} (${esc(a.pac)})</option>`).join('')}<option value="new" ${S.inv.length?'':'selected'}>➕ Nuovo titolo…</option></select>
+  <div id="i-new"><label>Nome del titolo</label><input id="i-n" placeholder="Es. BTP Italia 2030 / VWCE"><label>Tipo</label><select id="i-k"><option>ETF</option><option>BTP</option><option>Azione</option><option>Altro</option></select>
+  <label>PAC</label><select id="i-pac">${S.pacs.map(p=>`<option>${esc(p)}</option>`).join('')}</select></div>
   <label>Operazione</label><select id="i-t" onchange="invTog()"><option value="buy">Acquisto</option><option value="sell">Vendita</option><option value="div">Cedola / dividendo incassato</option></select>
   <label>Data</label><input id="i-d" type="date" value="${today()}">
   <div id="i-op"><label>Quantità (per i BTP: valore nominale in €)</label><input id="i-q" type="number" inputmode="decimal" step="any" min="0">
   <label>Prezzo unitario (per i BTP: prezzo ogni 100 €)</label><input id="i-p" type="number" inputmode="decimal" step="any" min="0">
   <label>Commissioni (€, facoltative)</label><input id="i-f" type="number" inputmode="decimal" step="any" min="0"></div>
-  <div id="i-dv"><label>Importo incassato (€)</label><input id="i-m" type="number" inputmode="decimal" step="any" min="0"></div>
-  <button style="width:100%;margin-top:8px" onclick="saveOp()">Salva</button></div>`;
+  <div id="i-dv"><label>Cedola / dividendo lordo (€)</label><input id="i-g" type="number" inputmode="decimal" step="any" min="0" oninput="divSum()">
+  <label>Tasse sulla cedola (€)</label><input id="i-x" type="number" inputmode="decimal" step="any" min="0" oninput="divSum()">
+  <button class="ghost" type="button" style="margin-bottom:12px" onclick="tax125()">Calcola 12,5% (titoli di Stato)</button>
+  <div style="margin-bottom:12px">Cedola netta: <b id="i-net">${eur(0)}</b></div></div>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="i-cash" type="checkbox" checked style="width:auto;margin:0"> Movimenta la liquidità del PAC</label>
+  <button style="width:100%;margin-top:12px" onclick="saveOp()">Salva</button></div>`;
 }
 function invTog(){
   $('#i-new').hidden=$('#i-a').value!=='new';
   const d=$('#i-t').value==='div';$('#i-op').hidden=d;$('#i-dv').hidden=!d;
 }
 function saveOp(){
-  const sel=$('#i-a').value,type=$('#i-t').value,o={id:uid(),date:$('#i-d').value||today(),type};
-  if(type==='div'){o.amount=num('i-m');if(!(o.amount>0))return alert('Inserisci l’importo incassato.')}
-  else{o.qty=num('i-q');o.price=num('i-p');o.fee=num('i-f')||0;if(!(o.qty>0&&o.price>0))return alert('Inserisci quantità e prezzo.')}
+  const sel=$('#i-a').value,type=$('#i-t').value,o={id:uid(),date:$('#i-d').value||today(),type,cash:$('#i-cash').checked};
+  if(type==='div'){
+    const g=num('i-g'),x=num('i-x')||0;
+    if(!(g>0))return alert('Inserisci la cedola lorda.');
+    if(x>g)return alert('Le tasse non possono superare la cedola lorda.');
+    o.gross=g;o.tax=x;o.amount=Math.round((g-x)*100)/100;
+  }else{o.qty=num('i-q');o.price=num('i-p');o.fee=num('i-f')||0;if(!(o.qty>0&&o.price>0))return alert('Inserisci quantità e prezzo.')}
   let a;
   if(sel==='new'){
     const n=$('#i-n').value.trim();
     if(!n)return alert('Scrivi il nome del titolo.');
     if(type!=='buy')return alert('Un nuovo titolo parte da un acquisto.');
-    a={id:uid(),name:n,kind:$('#i-k').value,ops:[],prices:[]};S.inv.push(a);
+    a={id:uid(),name:n,kind:$('#i-k').value,pac:$('#i-pac').value,ops:[],prices:[]};S.inv.push(a);
   }else{
     a=S.inv.find(x=>x.id===sel);
     if(type==='sell'&&o.qty>calc(a).q+1e-9)return alert('Stai vendendo più di quanto possiedi.');
@@ -214,21 +315,90 @@ function updPrice(id){
   if(!(v>0))return;
   a.prices=(a.prices||[]).filter(p=>p.date!==today());a.prices.push({date:today(),price:v});save();render();
 }
+function setPac(id,p){S.inv.find(a=>a.id===id).pac=p;save();render()}
 function delOp(aid,oid){if(confirm('Eliminare questa operazione?')){const a=S.inv.find(x=>x.id===aid);a.ops=a.ops.filter(o=>o.id!==oid);save();render()}}
 function delAsset(id){if(confirm('Eliminare il titolo e tutte le sue operazioni?')){S.inv=S.inv.filter(a=>a.id!==id);save();iv={v:'list'};render()}}
 
+/* ---------- impostazioni ---------- */
 function settings(){
-  return `<h1>Impostazioni</h1><div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>`;
+  return `<h1>Impostazioni</h1><div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
+  <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>`;
 }
+function renPac(i,v){v=v.trim();const o=S.pacs[i];if(!v||S.pacs.includes(v))return render();S.pacs[i]=v;S.inv.forEach(a=>{if(a.pac===o)a.pac=v});S.cash.forEach(c=>{if(c.pac===o)c.pac=v});save();render()}
+function addPac(){let n=S.pacs.length+1;while(S.pacs.includes('PAC'+n))n++;S.pacs.push('PAC'+n);save();render()}
 function backup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='fin-fam-dati-'+today()+'.json';a.click()}
 
+function catChg(){
+  const out=$('#f-type').value==='out';
+  $('#f-bp').hidden=!(out&&$('#f-cat').value===SPESA);$('#f-hint').hidden=out;bpTog();
+}
+function bpTog(){const on=!$('#f-bp').hidden&&$('#f-bpc').checked;$('#f-bpf').hidden=!on;$('#f-amt').readOnly=on;if(on)bpSum()}
+function bpSum(){const v=num('f-bpv')||0,r=num('f-bpr')||0;$('#f-amt').value=Math.round((v+r)*100)/100||'';$('#f-bpt').innerHTML=eur(v+r)}
+function filt(){
+  const q=F.q.trim().toLowerCase();
+  return real().filter(t=>{
+    const [y,m,d]=t.date.split('-');
+    if(F.y&&y!==F.y||F.m&&m!==F.m||F.d&&d!==F.d||F.t&&t.type!==F.t||F.c&&t.cat!==F.c)return false;
+    if(F.g&&(t.type==='in'?'Entrate':grpOf(t.cat))!==F.g)return false;
+    return !q||(t.cat+' '+(t.note||'')+' '+t.amount+' '+t.date).toLowerCase().includes(q);
+  }).sort((a,b)=>byD(b,a));
+}
+function resHtml(){
+  const l=filt(),s=split(l);
+  return `<div class="card"><div class="row"><b>${l.length} voci</b><span class="mute">Entrate nette ${eur(s.net)} · Uscite ${eur(s.out)}</span></div>${l.length?l.slice(0,300).map(txRow).join('')+(l.length>300?'<div class="mute">Mostrate le prime 300: restringi la ricerca.</div>':''):'<div class="empty">Nessun risultato.</div>'}</div>`;
+}
+function fq(v){F.q=v;$('#res').innerHTML=resHtml()}
+function setF(k,v){F[k]=v;if(k==='g')F.c='';render()}
+function clrF(){F={q:'',y:'',m:'',d:'',g:'',c:'',t:''};render()}
+function ledger(p){
+  const L=S.cash.filter(c=>c.pac===p).map(c=>({id:c.id,date:c.date,amt:c.type==='dep'?c.amount:-c.amount,l:c.type==='dep'?'Bonifico in entrata':c.type==='wd'?'Prelievo':'FEE · '+c.sub,note:c.note}));
+  S.inv.filter(a=>a.pac===p).forEach(a=>a.ops.filter(o=>o.cash!==false).forEach(o=>{
+    if(o.type==='buy')L.push({date:o.date,amt:-(o.qty*o.price*fac(a)+(o.fee||0)),l:'Acquisto '+a.name});
+    else if(o.type==='sell')L.push({date:o.date,amt:o.qty*o.price*fac(a)-(o.fee||0),l:'Vendita '+a.name});
+    else L.push({date:o.date,amt:o.amount,l:'Cedola netta '+a.name})}));
+  L.sort((x,y)=>byD(x,y)||y.amt-x.amt);let b=0;L.forEach(x=>{b+=x.amt;x.bal=b});return L;
+}
+function cashBal(p){const l=ledger(p);return l.length?l[l.length-1].bal:0}
+function divSum(){$('#i-net').innerHTML=eur((num('i-g')||0)-(num('i-x')||0))}
+function tax125(){$('#i-x').value=Math.round((num('i-g')||0)*12.5)/100||'';divSum()}
+function cashView(){
+  const p=S.pacs[iv.pi];if(!p){iv={v:'list'};return invest()}
+  const L=ledger(p),bal=L.length?L[L.length-1].bal:0,cs=S.cash.filter(c=>c.pac===p),sm=f=>cs.filter(f).reduce(sum,0);
+  const R=(l,v)=>`<div class="row" style="padding:4px 0"><span class="mute">${l}</span><span>${v}</span></div>`;
+  return `<button class="ghost" onclick="iv={v:'list'};render()">‹ Indietro</button><h1 style="margin-top:12px">Liquidità ${esc(p)}</h1>
+  <div class="card"><div class="mute">Liquidità disponibile</div><div class="big ${bal<-0.005?'out':''}">${eur(bal)}</div>${bal<-0.005?'<div class="out">⚠ Liquidità negativa: registra i bonifici versati nel PAC.</div>':''}
+  ${R('Bonifici versati',eur(sm(c=>c.type==='dep')))}${R('Prelievi',eur(sm(c=>c.type==='wd')))}${R('FEE · Tasse',eur(sm(c=>c.type==='fee'&&c.sub==='Tasse')))}${R('FEE · Commissioni e altro',eur(sm(c=>c.type==='fee'&&c.sub!=='Tasse')))}</div>
+  <button style="width:100%;margin-bottom:12px" onclick="iv={v:'cform',pi:${iv.pi}};render()">+ Bonifico / Prelievo / FEE</button>
+  <h2>Movimenti di liquidità</h2><div class="card">${L.length?[...L].reverse().map(x=>`<div class="tx row"><div><div>${esc(x.l)}${x.note?' · '+esc(x.note):''}</div><div class="mute">${fd(x.date)} · saldo ${eur(x.bal)}</div></div><div class="row"><b class="${x.amt>=0?'in':'out'}">${sg(x.amt)}</b>${x.id?`<button class="del" onclick="delCash('${x.id}')" aria-label="Elimina">✕</button>`:''}</div></div>`).join(''):'<div class="empty">Nessun movimento.</div>'}</div>
+  <div class="mute">Acquisti, vendite e cedole nette vengono registrati in automatico (salvo opzione disattivata nell’operazione).</div>`;
+}
+function cashForm(){
+  return `<button class="ghost" onclick="iv={v:iv.pi!=null?'cash':'list',pi:iv.pi};render()">‹ Indietro</button><h1 style="margin-top:12px">Liquidità / FEE</h1><div class="card">
+  <label>PAC</label><select id="c-pac">${S.pacs.map((p,i)=>`<option value="${i}" ${i===iv.pi?'selected':''}>${esc(p)}</option>`).join('')}</select>
+  <label>Tipo</label><select id="c-t" onchange="cfTog()"><option value="dep">Bonifico in entrata</option><option value="wd">Prelievo</option><option value="fee">FEE (scala dalla liquidità)</option></select>
+  <div id="c-subw"><label>Tipo di FEE</label><select id="c-sub"><option>Tasse</option><option>Commissioni</option><option>Altro</option></select></div>
+  <label>Data</label><input id="c-d" type="date" value="${today()}">
+  <label>Importo (€)</label><input id="c-amt" type="number" inputmode="decimal" step="0.01" min="0">
+  <label>Nota (facoltativa)</label><input id="c-n" placeholder="Es. imposta di bollo">
+  <button style="width:100%;margin-top:8px" onclick="saveCash()">Salva</button></div>`;
+}
+function cfTog(){$('#c-subw').hidden=$('#c-t').value!=='fee'}
+function saveCash(){
+  const amount=Math.round(num('c-amt')*100)/100;
+  if(!(amount>0))return alert('Inserisci un importo maggiore di zero.');
+  const pi=+$('#c-pac').value,type=$('#c-t').value;
+  S.cash.push({id:uid(),pac:S.pacs[pi],date:$('#c-d').value||today(),type,sub:type==='fee'?$('#c-sub').value:'',amount,note:$('#c-n').value.trim()});
+  save();iv={v:'cash',pi};render();
+}
+function delCash(id){if(confirm('Eliminare questo movimento?')){S.cash=S.cash.filter(c=>c.id!==id);save();render()}}
 const TABS=[['home','Riepilogo'],['add','Aggiungi'],['list','Movimenti'],['inv','Investimenti'],['settings','Impostazioni']];
-const go=k=>{tab=k;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
+const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
   $('#app').innerHTML={home,add,list,inv:invest,settings}[tab]();
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
-  if(tab==='add')setCats();
+  if(tab==='add'){setCats();if(ed){const t=S.tx.find(x=>x.id===ed.id);if(t){$('#f-type').value=t.type;setCats();$('#f-cat').value=t.cat;catChg();if(t.bp){$('#f-bpc').checked=true;bpTog();bpSum()}}}}
   if(tab==='inv'&&iv.v==='form')invTog();
+  if(tab==='inv'&&iv.v==='cform')cfTog();
 }
 render();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
