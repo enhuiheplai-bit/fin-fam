@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fin-Fam">
 <style>
-:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c;--in:#1d7a4d;--out:#b4432f;--alt:#b7791f}
-@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9;--in:#58c58b;--out:#ef8a74;--alt:#e0a74a}}
+:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c;--in:#1d7a4d;--out:#b4432f;--alt:#b7791f;--c3:#6a4fc2}
+@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9;--in:#58c58b;--out:#ef8a74;--alt:#e0a74a;--c3:#a995ff}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom))}
@@ -49,6 +49,7 @@ summary{list-style:none;cursor:pointer;padding:6px 0}summary::-webkit-details-ma
 table{border-collapse:collapse;width:100%;font-size:.8rem}th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}
 .pricebox{border-color:var(--main);border-width:2px}
 .leg{flex-wrap:wrap}.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.fgrid select{margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.chip{padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:.82rem}.chip.on{background:var(--main);color:#fff;border-color:var(--main)}
 </style>
 </head>
 <body>
@@ -71,7 +72,7 @@ const GR=[
 ['Baby',['🍼 BABY/Care','🧷 BABY/Salute','🧦 BABY/Abbigliamento']],
 ['Casa',['💡 LUCE','🕯️ GAS','💧 ACQUA','📞 TELEFONO','🏠 CONDOMINIO','🏘️ CONDOMINIO AREA CORTILIVA','🗑️ TARI']],
 ['Trasporto',['🚗 Varie','🚗 AUTO_FORD_Altro','🚗 Auto_Moto_Carburante','🚗 Auto_Moto_Altro']]];
-const CI=['Salary EH','Taxes EH','Salary ZX','Taxes ZX','Other EH&ZX','AUU MY'],TAX=['Taxes EH','Taxes ZX'];
+const CI=['Salary EH','Salary ZX','Other EH&ZX','AUU MY'],TAX=['Taxes EH','Taxes ZX'];
 const isTax=c=>TAX.includes(c);
 const grpOf=c=>(GR.find(g=>g[1].includes(c))||['Altro'])[0];
 const MN=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
@@ -82,7 +83,7 @@ const eur=n=>n.toLocaleString('it-IT',{style:'currency',currency:'EUR'});
 const eur0=n=>n.toLocaleString('it-IT',{maximumFractionDigits:0})+' €';
 const sg=n=>(n>=0?'+':'−')+eur(Math.abs(n));
 const pct=n=>(n>=0?'+':'−')+Math.abs(n).toFixed(2).replace('.',',')+'%';
-const num=id=>parseFloat(($('#'+id).value||'').replace(',','.'));
+const num=id=>parseFloat(String($('#'+id).value||'').replace(',','.'));
 const fd=d=>new Date(d+'T00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'2-digit'});
 const mName=m=>{const [y,mo]=m.split('-');return new Date(y,mo-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'})};
 const shift=d=>{const [y,m]=month.split('-').map(Number);const dt=new Date(y,m-1+d,1);month=dt.getFullYear()+'-'+pad(dt.getMonth()+1);render()};
@@ -93,17 +94,21 @@ const monthTx=()=>real().filter(t=>t.date.startsWith(month)).sort((a,b)=>byD(b,a
 const nextM=d=>{const [y,m,dd]=d.split('-').map(Number),l=new Date(y,m+1,0).getDate(),t=new Date(y,m,Math.min(dd,l));return t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate())};
 const mnav=()=>`<div class="mnav"><button class="ghost" onclick="shift(-1)">‹</button><b>${mName(month)}</b><button class="ghost" onclick="shift(1)">›</button></div>`;
 const seg=()=>`<div class="seg"><button class="${hv==='m'?'on':''}" onclick="hv='m';render()">Mese</button><button class="${hv==='y'?'on':''}" onclick="hv='y';render()">Anno</button></div>`;
-const legend=(a,b,va,vb)=>`<div class="leg"><span><i style="background:var(--main)"></i>${a}${va?': <b>'+va+'</b>':''}</span><span><i style="background:var(--alt)"></i>${b}${vb?': <b>'+vb+'</b>':''}</span></div>`;
+const legend=(a,b,va,vb)=>`<div class="leg"><span><i style="background:var(--main)"></i>${a}${va?': <b>'+va+'</b>':''}</span>${b?`<span><i style="background:var(--alt)"></i>${b}${vb?': <b>'+vb+'</b>':''}</span>`:''}</div>`;
 const SPESA='🍲 SPESA';
 let F={q:'',y:today().slice(0,4),m:today().slice(5,7),d:'',g:'',c:'',t:''};
+const CHT=['ETF','BTP','Azione','Altro'];
+let CH={scope:'all',types:['ETF','BTP','Azione','Altro'],ser:['v','c'],rng:'max',from:'',to:''};
 
 /* ---------- grafici ---------- */
 function bars(items,na,nb,va,vb){
-  const W=340,H=170,pb=22,pt=16,pl=4,mx=Math.max(1,...items.flatMap(i=>[i.a,i.b])),n=items.length,gw=(W-pl*2)/n,bw=Math.min(24,gw/2-2),y=v=>pt+(H-pt-pb)*(1-v/mx);
+  const W=340,H=170,pb=22,pt=16,pl=4,one=!nb,mx=Math.max(1,...items.flatMap(i=>[i.a,i.b||0])),n=items.length,gw=(W-pl*2)/n,bw=one?Math.min(28,gw-4):Math.min(24,gw/2-2),y=v=>pt+(H-pt-pb)*(1-v/mx),st=Math.ceil(n/12);
   const lab=(v,x)=>n<=4?`<text x="${x}" y="${y(v)-3}" font-size="8" text-anchor="middle" fill="var(--ink)">${eur0(v)}</text>`:'';
   let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><text x="${pl}" y="10" font-size="9" fill="var(--mute)">${eur0(mx)}</text><line x1="0" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="var(--line)"/>`;
   items.forEach((it,i)=>{const cx=pl+gw*i+gw/2;
-    s+=`<rect x="${cx-bw-1}" y="${y(it.a)}" width="${bw}" height="${H-pb-y(it.a)}" fill="var(--main)" rx="2"><title>${esc(it.l)} · ${na}: ${eur(it.a)}</title></rect><rect x="${cx+1}" y="${y(it.b)}" width="${bw}" height="${H-pb-y(it.b)}" fill="var(--alt)" rx="2"><title>${esc(it.l)} · ${nb}: ${eur(it.b)}</title></rect>${lab(it.a,cx-bw/2-1)}${lab(it.b,cx+bw/2+1)}<text x="${cx}" y="${H-8}" font-size="9" text-anchor="middle" fill="var(--mute)">${esc(it.l)}</text>`});
+    s+=one?`<rect x="${cx-bw/2}" y="${y(it.a)}" width="${bw}" height="${H-pb-y(it.a)}" fill="var(--main)" rx="2"><title>${esc(it.l)} · ${na}: ${eur(it.a)}</title></rect>${lab(it.a,cx)}`
+    :`<rect x="${cx-bw-1}" y="${y(it.a)}" width="${bw}" height="${H-pb-y(it.a)}" fill="var(--main)" rx="2"><title>${esc(it.l)} · ${na}: ${eur(it.a)}</title></rect><rect x="${cx+1}" y="${y(it.b)}" width="${bw}" height="${H-pb-y(it.b)}" fill="var(--alt)" rx="2"><title>${esc(it.l)} · ${nb}: ${eur(it.b)}</title></rect>${lab(it.a,cx-bw/2-1)}${lab(it.b,cx+bw/2+1)}`;
+    if(i%st===0)s+=`<text x="${cx}" y="${H-8}" font-size="9" text-anchor="middle" fill="var(--mute)">${esc(it.l)}</text>`});
   return legend(na,nb,va,vb)+s+'</svg>';
 }
 function lines(p,na,nb){
@@ -121,17 +126,18 @@ function lines(p,na,nb){
 
 /* ---------- riepilogo ---------- */
 function txRow(t){
-  const s=t.type==='in'&&!isTax(t.cat)?1:-1,bp=t.bp?` · 🎟 buoni ${eur(t.bpv)} + resto ${eur(t.bpr)}`:'';
-  return `<div class="tx row"><div><div>${esc(t.cat)}${t.note?' · '+esc(t.note):''}</div><div class="mute">${fd(t.date)}${bp}</div></div><div class="row"><b class="${s>0?'in':'out'}">${s>0?'+':'−'}${eur(t.amount)}</b><button class="ic" onclick="openForm('${t.id}','edit')" aria-label="Modifica">✎</button><button class="ic" onclick="openForm('${t.id}','dup')" aria-label="Duplica nel mese successivo">⧉</button><button class="del" onclick="del('${t.id}')" aria-label="Elimina">✕</button></div></div>`;
+  const s=t.type==='in'&&!isTax(t.cat)?1:-1,bp=t.bp?` · 🎟 buoni ${eur(t.bpv)} + resto ${eur(t.bpr)}`:'',
+  pay=t.pay&&t.gross?` · Lordo ${eur(t.gross)} · Trattenute ${eur(t.ded||0)} (${(t.pct||0).toFixed(1).replace('.',',')}%)`:'';
+  return `<div class="tx row"><div><div>${esc(t.cat)}${t.company?' · '+esc(t.company):''}${t.note?' · '+esc(t.note):''}</div><div class="mute">${fd(t.date)}${bp}${pay}</div></div><div class="row"><b class="${s>0?'in':'out'}">${s>0?'+':'−'}${eur(t.amount)}</b><button class="ic" onclick="openForm('${t.id}','edit')" aria-label="Modifica">✎</button><button class="ic" onclick="openForm('${t.id}','dup')" aria-label="Duplica nel mese successivo">⧉</button><button class="del" onclick="del('${t.id}')" aria-label="Elimina">✕</button></div></div>`;
 }
 const split=tx=>{const ins=tx.filter(t=>t.type==='in'),gross=ins.filter(t=>!isTax(t.cat)).reduce(sum,0),tax=ins.filter(t=>isTax(t.cat)).reduce(sum,0);return{ins,gross,tax,net:gross-tax,outs:tx.filter(t=>t.type==='out'),out:tx.filter(t=>t.type==='out').reduce(sum,0)}};
 function home(){return `<h1>Fin-Fam</h1>${seg()}${hv==='y'?yearView():monthView()}`}
 function monthView(){
-  const {ins,gross,tax,net,outs,out}=split(monthTx()),g={},bpTot=outs.reduce((a,t)=>a+(t.bp?t.bpv:0),0);
+  const {ins,gross,tax,net,outs,out}=split(monthTx()),g={},bpTot=outs.reduce((a,t)=>a+(t.bp?t.bpv:0),0),pg=ins.reduce((a,t)=>a+(t.pay?t.gross||0:0),0),pd=ins.reduce((a,t)=>a+(t.pay?t.ded||0:0),0);
   outs.forEach(t=>{const k=grpOf(t.cat);g[k]=g[k]||{tot:0,c:{}};g[k].tot+=t.amount;(g[k].c[t.cat]=g[k].c[t.cat]||[]).push(t)});
   return `${mnav()}<div class="card"><div class="mute">Saldo del mese</div><div class="big ${net-out<0?'out':'in'}">${eur(net-out)}</div>
   <div class="row" style="margin-top:8px"><span class="in">Entrate nette ${eur(net)}</span><span class="out">Uscite ${eur(out)}</span></div>
-  ${tax?`<div class="mute" style="margin-top:4px">Lordo ${eur(gross)} · Tasse ${eur(tax)}</div>`:''}${bpTot?`<div class="mute">🎟 Buoni pasto usati: ${eur(bpTot)}</div>`:''}</div>
+  ${pg?`<div class="mute" style="margin-top:4px">Lordo buste paga ${eur(pg)} · Trattenute ${eur(pd)}</div>`:''}${bpTot?`<div class="mute">🎟 Buoni pasto usati: ${eur(bpTot)}</div>`:''}</div>
   ${ins.length?`<details class="card"><summary class="row"><b>Entrate</b><b class="in">${eur(net)} ▾</b></summary>${ins.map(txRow).join('')}</details>`:''}
   <h2>Spese per categoria</h2>${Object.keys(g).length?Object.entries(g).sort((a,b)=>b[1].tot-a[1].tot).map(([n,x])=>`<div class="card"><div class="row"><b>${esc(n)}</b><b>${eur(x.tot)}</b></div><div style="height:8px"></div>${Object.entries(x.c).sort((a,b)=>b[1].reduce(sum,0)-a[1].reduce(sum,0)).map(([c,l])=>{const v=l.reduce(sum,0);return `<details><summary class="row"><span>${esc(c)} ▾</span><span>${eur(v)}</span></summary>${l.map(txRow).join('')}</details><div class="bar"><i style="width:${v/out*100}%"></i></div>`}).join('')}</div>`).join(''):'<div class="card empty">Nessuna spesa questo mese.<br>Tocca “Aggiungi” per registrarne una.</div>'}`;
 }
@@ -141,7 +147,7 @@ function yearView(){
   const T=rows.reduce((a,r)=>({net:a.net+r.net,out:a.out+r.out}),{net:0,out:0}),names=[...GR.map(g=>g[0]),'Altro'];
   return `<div class="mnav"><button class="ghost" onclick="yr=String(+yr-1);render()">‹</button><b>${yr}</b><button class="ghost" onclick="yr=String(+yr+1);render()">›</button></div>
   <div class="card"><div class="mute">Saldo dell’anno</div><div class="big ${T.net-T.out<0?'out':'in'}">${eur(T.net-T.out)}</div><div class="row" style="margin-top:8px"><span class="in">Entrate nette ${eur(T.net)}</span><span class="out">Uscite ${eur(T.out)}</span></div></div>
-  <h2>Entrate nette e uscite per mese</h2><div class="card">${bars(rows.map(r=>({l:MN[r.m-1],a:Math.max(0,r.net),b:r.out})),'Entrate nette','Uscite','anno '+eur0(T.net),'anno '+eur0(T.out))}</div>
+  ${payCard(real().filter(t=>t.date.startsWith(yr)))}<h2>Entrate nette e uscite per mese</h2><div class="card">${bars(rows.map(r=>({l:MN[r.m-1],a:Math.max(0,r.net),b:r.out})),'Entrate nette','Uscite','anno '+eur0(T.net),'anno '+eur0(T.out))}</div>
   <h2>Andamento mensile</h2><div class="card" style="overflow-x:auto"><table><tr><th>Mese</th><th>Entrate</th><th>Uscite</th><th>Saldo</th></tr>
   ${rows.map(r=>`<tr onclick="month='${yr}-${pad(r.m)}';hv='m';render()" style="cursor:pointer"><td>${MN[r.m-1]}</td><td>${eur0(r.net)}</td><td>${eur0(r.out)}</td><td class="${r.net-r.out<0?'out':'in'}">${eur0(r.net-r.out)}</td></tr>`).join('')}
   <tr><th>Totale</th><th>${eur0(T.net)}</th><th>${eur0(T.out)}</th><th>${eur0(T.net-T.out)}</th></tr></table><div class="mute" style="margin-top:6px">Tocca un mese per aprirlo.</div></div>
@@ -152,16 +158,18 @@ function yearView(){
 /* ---------- aggiungi / modifica / duplica ---------- */
 function openForm(id,mode){ed={id,mode};tab='add';render();scrollTo(0,0)}
 function add(){
-  const t=ed&&S.tx.find(x=>x.id===ed.id),title=!t?'Aggiungi':ed.mode==='edit'?'Modifica voce':'Duplica voce';
-  return `<h1>${title}</h1>${t&&ed.mode==='dup'?'<p class="mute" style="margin-top:-6px">Copia nel mese successivo: controlla importo e data, poi salva.</p>':''}<div class="card">
+  const t=ed&&S.tx.find(x=>x.id===ed.id),title=!t?'Aggiungi':ed.mode==='edit'?'Modifica voce':'Duplica voce',
+  fl=(id,l,v,ex='')=>`<div><label>${l}</label><input id="${id}" type="number" inputmode="decimal" step="0.01" min="0" value="${t&&t.pay&&v?v:''}" ${ex}></div>`;
+  return `<h1>${title}</h1>${t?'':voiceCard()}${t&&ed.mode==='dup'?'<p class="mute" style="margin-top:-6px">Copia nel mese successivo: controlla importo e data, poi salva.</p>':''}<div class="card">
   <label>Tipo</label><select id="f-type" onchange="setCats()"><option value="out">Spesa</option><option value="in">Entrata</option></select>
-  <label>Importo (€)</label><input id="f-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" value="${t?t.amount:''}">
   <label>Categoria</label><select id="f-cat" onchange="catChg()"></select>
-  <div id="f-hint" class="mute" hidden style="margin:-6px 0 12px">Salary = stipendio lordo. Taxes = tutte le trattenute della busta paga (vengono sottratte dalle entrate).</div>
+  <label id="f-amtl">Importo (€)</label><input id="f-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" value="${t?t.amount:''}" oninput="payCalc()">
   <div id="f-bp" hidden style="margin-bottom:12px"><label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="f-bpc" type="checkbox" style="width:auto;margin:0" onchange="bpTog()"> Pagata con buoni pasto</label>
   <div id="f-bpf" hidden style="margin-top:10px"><label>Importo pagato con i buoni pasto (€)</label><input id="f-bpv" type="number" inputmode="decimal" step="0.01" min="0" oninput="bpSum()" value="${t&&t.bp?t.bpv:''}">
   <label>Importo residuo, pagato con altri mezzi (€)</label><input id="f-bpr" type="number" inputmode="decimal" step="0.01" min="0" oninput="bpSum()" value="${t&&t.bp?t.bpr:''}">
   <div>Totale spesa: <b id="f-bpt"></b></div></div></div>
+  <div id="f-pay" hidden><h2 style="margin:0 0 8px">Dati busta paga</h2><label>Company</label><input id="f-co" value="${t&&t.company?esc(t.company):''}" placeholder="Nome azienda">
+  <div class="fgrid">${fl('f-ral','RAL (€)',t&&t.ral)}${fl('f-gr','Lordo (€)',t&&t.gross,'oninput="payCalc()"')}${fl('f-bm','Buoni pasto (€)',t&&t.bpm)}${fl('f-oh','h straordinario',t&&t.otH)}${fl('f-oe','€ straordinario',t&&t.otE)}${fl('f-de','Totale trattenute (€)',t&&t.ded,`data-auto="${t&&t.pay&&t.ded?'0':'1'}" oninput="this.dataset.auto='0'"`)}${fl('f-tfr','TFR (€)',t&&t.tfr)}<div><label>% Trattenute</label><input id="f-pc" readonly placeholder="automatica"></div></div></div>
   <label>Data</label><input id="f-date" type="date" value="${t?(ed.mode==='dup'?nextM(t.date):t.date):today()}">
   <label>Nota (facoltativa)</label><input id="f-note" placeholder="Es. bolletta telefono" value="${t?esc(t.note||''):''}">
   <button style="width:100%;margin-top:8px" onclick="addTx()">Salva</button>${t?`<button class="ghost" style="width:100%;margin-top:8px" onclick="ed=null;tab='home';render()">Annulla</button>`:''}</div>`;
@@ -172,11 +180,13 @@ function setCats(){
   catChg();
 }
 function addTx(){
-  const type=$('#f-type').value,cat=$('#f-cat').value,bp=type==='out'&&cat===SPESA&&$('#f-bpc').checked;
-  let amount=Math.round(num('f-amt')*100)/100,bpv=0,bpr=0;
-  if(bp){bpv=Math.round((num('f-bpv')||0)*100)/100;bpr=Math.round((num('f-bpr')||0)*100)/100;amount=Math.round((bpv+bpr)*100)/100}
+  const type=$('#f-type').value,cat=$('#f-cat').value,bp=type==='out'&&cat===SPESA&&$('#f-bpc').checked,pay=type==='in'&&cat.startsWith('Salary'),r=v=>Math.round((v||0)*100)/100;
+  let amount=Math.round(num('f-amt')*100)/100,bpv=0,bpr=0,P={pay:false,company:'',ral:0,gross:0,bpm:0,otH:0,otE:0,ded:0,tfr:0,pct:0};
+  if(bp){bpv=r(num('f-bpv'));bpr=r(num('f-bpr'));amount=r(bpv+bpr)}
   if(!(amount>0)){alert('Inserisci un importo maggiore di zero.');return}
-  const date=$('#f-date').value||today(),d={type,amount,cat,date,note:$('#f-note').value.trim(),bp,bpv,bpr};
+  if(pay){const g=r(num('f-gr'));if(g>0&&amount>g){alert('Il netto non può superare il lordo.');return}
+    P={pay:true,company:$('#f-co').value.trim(),ral:r(num('f-ral')),gross:g,bpm:r(num('f-bm')),otH:num('f-oh')||0,otE:r(num('f-oe')),ded:r(num('f-de')),tfr:r(num('f-tfr')),pct:g>0?(g-amount)/g*100:0}}
+  const date=$('#f-date').value||today(),d={type,amount,cat,date,note:$('#f-note').value.trim(),bp,bpv,bpr,...P};
   const t=ed&&ed.mode==='edit'&&S.tx.find(x=>x.id===ed.id);
   if(t)Object.assign(t,d);else S.tx.push({id:uid(),...d});
   save();month=date.slice(0,7);F={q:'',y:date.slice(0,4),m:date.slice(5,7),d:'',g:'',c:'',t:''};tab=ed?'home':'list';hv='m';ed=null;render();
@@ -238,7 +248,7 @@ function invest(){
   <div class="row" style="margin-top:6px"><span>Liquidità ${eur(LQ)}</span><b>Patrimonio ${eur(T.v+LQ)}</b></div>
   <div class="mute" style="margin-top:6px">Già incassato (vendite e cedole nette): ${sg(T.g)}</div></div>
   <h2>Riepilogo per PAC</h2><div class="card">${bars([...S.pacs.map(p=>{const t=tot(rows.filter(r=>r.a.pac===p));return {l:p,a:t.v,b:t.c}}),{l:'Totale',a:T.v,b:T.c}],'Controvalore','Prezzo pagato','Totale '+eur0(T.v),'Totale '+eur0(T.c))}</div>
-  <h2>Andamento totale famiglia</h2><div class="card">${lines(timeline(S.inv),'Controvalore','Prezzo pagato')}</div>
+  <h2>Grafico dinamico</h2><div class="card">${chartHtml()}</div>
   <div class="row" style="gap:8px;margin:4px 0 12px"><button style="flex:1" onclick="iv={v:'form',id:null};render()">+ Operazione titolo</button><button class="ghost" style="flex:1" onclick="iv={v:'cform',pi:null};render()">+ Liquidità / FEE</button></div>
   ${S.pacs.map((p,i)=>{const rs=rows.filter(r=>r.a.pac===p),t=tot(rs),b=cashBal(p);return `<h2>${esc(p)} · titoli ${eur(t.v)} <span class="${t.v-t.c>=0?'in':'out'}">${sg(t.v-t.c)}</span></h2>
   <div class="card" style="cursor:pointer" onclick="iv={v:'cash',pi:${i}};render()"><div class="row"><span>💶 Liquidità disponibile</span><b class="${b<-0.005?'out':''}">${eur(b)}</b></div><div class="mute">Tocca per bonifici, FEE e movimenti${b<-0.005?' · ⚠ negativa':''}</div></div>
@@ -329,8 +339,9 @@ function addPac(){let n=S.pacs.length+1;while(S.pacs.includes('PAC'+n))n++;S.pac
 function backup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='fin-fam-dati-'+today()+'.json';a.click()}
 
 function catChg(){
-  const out=$('#f-type').value==='out';
-  $('#f-bp').hidden=!(out&&$('#f-cat').value===SPESA);$('#f-hint').hidden=out;bpTog();
+  const out=$('#f-type').value==='out',c=$('#f-cat').value;
+  $('#f-bp').hidden=!(out&&c===SPESA);$('#f-pay').hidden=!(!out&&c.startsWith('Salary'));
+  $('#f-amtl').textContent=out?'Importo (€)':'Netto (€)';bpTog();
 }
 function bpTog(){const on=!$('#f-bp').hidden&&$('#f-bpc').checked;$('#f-bpf').hidden=!on;$('#f-amt').readOnly=on;if(on)bpSum()}
 function bpSum(){const v=num('f-bpv')||0,r=num('f-bpr')||0;$('#f-amt').value=Math.round((v+r)*100)/100||'';$('#f-bpt').innerHTML=eur(v+r)}
@@ -340,12 +351,14 @@ function filt(){
     const [y,m,d]=t.date.split('-');
     if(F.y&&y!==F.y||F.m&&m!==F.m||F.d&&d!==F.d||F.t&&t.type!==F.t||F.c&&t.cat!==F.c)return false;
     if(F.g&&(t.type==='in'?'Entrate':grpOf(t.cat))!==F.g)return false;
-    return !q||(t.cat+' '+(t.note||'')+' '+t.amount+' '+t.date).toLowerCase().includes(q);
+    return !q||(t.cat+' '+(t.note||'')+' '+(t.company||'')+' '+t.amount+' '+t.date+(t.bp?' buoni pasto buono pasto':'')+(t.pay?' busta paga stipendio'+(t.otH>0?' straordinario':''):'')).toLowerCase().includes(q);
   }).sort((a,b)=>byD(b,a));
 }
 function resHtml(){
-  const l=filt(),s=split(l);
-  return `<div class="card"><div class="row"><b>${l.length} voci</b><span class="mute">Entrate nette ${eur(s.net)} · Uscite ${eur(s.out)}</span></div>${l.length?l.slice(0,300).map(txRow).join('')+(l.length>300?'<div class="mute">Mostrate le prime 300: restringi la ricerca.</div>':''):'<div class="empty">Nessun risultato.</div>'}</div>`;
+  const l=filt(),s=split(l),bpl=l.filter(t=>t.bp);
+  return `<div class="card"><div class="row"><b>${l.length} voci</b><span class="mute">Entrate nette ${eur(s.net)} · Uscite ${eur(s.out)}</span></div>${bpl.length?`<div class="mute" style="margin-top:4px">🎟 ${bpl.length} spese con buoni pasto · buoni ${eur(bpl.reduce((a,t)=>a+t.bpv,0))} · resto ${eur(bpl.reduce((a,t)=>a+t.bpr,0))}</div>`:''}</div>
+  ${l.length?`<h2>Andamento nel tempo</h2><div class="card">${trend(l)}</div>`:''}${payCard(l)}
+  <div class="card">${l.length?l.slice(0,300).map(txRow).join('')+(l.length>300?'<div class="mute">Mostrate le prime 300: restringi la ricerca.</div>':''):'<div class="empty">Nessun risultato.</div>'}</div>`;
 }
 function fq(v){F.q=v;$('#res').innerHTML=resHtml()}
 function setF(k,v){F[k]=v;if(k==='g')F.c='';render()}
@@ -369,34 +382,175 @@ function cashView(){
   <div class="card"><div class="mute">Liquidità disponibile</div><div class="big ${bal<-0.005?'out':''}">${eur(bal)}</div>${bal<-0.005?'<div class="out">⚠ Liquidità negativa: registra i bonifici versati nel PAC.</div>':''}
   ${R('Bonifici versati',eur(sm(c=>c.type==='dep')))}${R('Prelievi',eur(sm(c=>c.type==='wd')))}${R('FEE · Tasse',eur(sm(c=>c.type==='fee'&&c.sub==='Tasse')))}${R('FEE · Commissioni e altro',eur(sm(c=>c.type==='fee'&&c.sub!=='Tasse')))}</div>
   <button style="width:100%;margin-bottom:12px" onclick="iv={v:'cform',pi:${iv.pi}};render()">+ Bonifico / Prelievo / FEE</button>
-  <h2>Movimenti di liquidità</h2><div class="card">${L.length?[...L].reverse().map(x=>`<div class="tx row"><div><div>${esc(x.l)}${x.note?' · '+esc(x.note):''}</div><div class="mute">${fd(x.date)} · saldo ${eur(x.bal)}</div></div><div class="row"><b class="${x.amt>=0?'in':'out'}">${sg(x.amt)}</b>${x.id?`<button class="del" onclick="delCash('${x.id}')" aria-label="Elimina">✕</button>`:''}</div></div>`).join(''):'<div class="empty">Nessun movimento.</div>'}</div>
-  <div class="mute">Acquisti, vendite e cedole nette vengono registrati in automatico (salvo opzione disattivata nell’operazione).</div>`;
+  <h2>Movimenti di liquidità</h2><div class="card">${L.length?[...L].reverse().map(x=>`<div class="tx row"><div><div>${esc(x.l)}${x.note?' · '+esc(x.note):''}</div><div class="mute">${fd(x.date)} · saldo ${eur(x.bal)}</div></div><div class="row"><b class="${x.amt>=0?'in':'out'}">${sg(x.amt)}</b>${x.id?`<button class="ic" onclick="iv={v:'cform',pi:${iv.pi},ce:'${x.id}'};render()" aria-label="Modifica">✎</button><button class="del" onclick="delCash('${x.id}')" aria-label="Elimina">✕</button>`:''}</div></div>`).join(''):'<div class="empty">Nessun movimento.</div>'}</div>
+  <div class="mute">Acquisti, vendite e cedole nette vengono registrati in automatico (per modificarli, apri il titolo e l’operazione).</div>`;
 }
 function cashForm(){
-  return `<button class="ghost" onclick="iv={v:iv.pi!=null?'cash':'list',pi:iv.pi};render()">‹ Indietro</button><h1 style="margin-top:12px">Liquidità / FEE</h1><div class="card">
-  <label>PAC</label><select id="c-pac">${S.pacs.map((p,i)=>`<option value="${i}" ${i===iv.pi?'selected':''}>${esc(p)}</option>`).join('')}</select>
-  <label>Tipo</label><select id="c-t" onchange="cfTog()"><option value="dep">Bonifico in entrata</option><option value="wd">Prelievo</option><option value="fee">FEE (scala dalla liquidità)</option></select>
-  <div id="c-subw"><label>Tipo di FEE</label><select id="c-sub"><option>Tasse</option><option>Commissioni</option><option>Altro</option></select></div>
-  <label>Data</label><input id="c-d" type="date" value="${today()}">
-  <label>Importo (€)</label><input id="c-amt" type="number" inputmode="decimal" step="0.01" min="0">
-  <label>Nota (facoltativa)</label><input id="c-n" placeholder="Es. imposta di bollo">
+  const c=iv.ce&&S.cash.find(x=>x.id===iv.ce),pi=c?S.pacs.indexOf(c.pac):iv.pi,sl=(v,l,sel)=>`<option value="${v}" ${sel?'selected':''}>${l}</option>`;
+  return `<button class="ghost" onclick="iv={v:iv.pi!=null?'cash':'list',pi:iv.pi};render()">‹ Indietro</button><h1 style="margin-top:12px">${c?'Modifica movimento':'Liquidità / FEE'}</h1><div class="card">
+  <label>PAC</label><select id="c-pac">${S.pacs.map((p,i)=>sl(i,esc(p),i===pi)).join('')}</select>
+  <label>Tipo</label><select id="c-t" onchange="cfTog()">${sl('dep','Bonifico in entrata',!c||c.type==='dep')}${sl('wd','Prelievo',c&&c.type==='wd')}${sl('fee','FEE (scala dalla liquidità)',c&&c.type==='fee')}</select>
+  <div id="c-subw"><label>Tipo di FEE</label><select id="c-sub">${['Tasse','Commissioni','Altro'].map(s=>sl(s,s,c&&c.sub===s)).join('')}</select></div>
+  <label>Data</label><input id="c-d" type="date" value="${c?c.date:today()}">
+  <label>Importo (€)</label><input id="c-amt" type="number" inputmode="decimal" step="0.01" min="0" value="${c?c.amount:''}">
+  <label>Nota (facoltativa)</label><input id="c-n" placeholder="Es. imposta di bollo" value="${c?esc(c.note||''):''}">
   <button style="width:100%;margin-top:8px" onclick="saveCash()">Salva</button></div>`;
 }
 function cfTog(){$('#c-subw').hidden=$('#c-t').value!=='fee'}
 function saveCash(){
   const amount=Math.round(num('c-amt')*100)/100;
   if(!(amount>0))return alert('Inserisci un importo maggiore di zero.');
-  const pi=+$('#c-pac').value,type=$('#c-t').value;
-  S.cash.push({id:uid(),pac:S.pacs[pi],date:$('#c-d').value||today(),type,sub:type==='fee'?$('#c-sub').value:'',amount,note:$('#c-n').value.trim()});
+  const pi=+$('#c-pac').value,type=$('#c-t').value,rec={pac:S.pacs[pi],date:$('#c-d').value||today(),type,sub:type==='fee'?$('#c-sub').value:'',amount,note:$('#c-n').value.trim()};
+  const c=iv.ce&&S.cash.find(x=>x.id===iv.ce);
+  if(c)Object.assign(c,rec);else S.cash.push({id:uid(),...rec});
   save();iv={v:'cash',pi};render();
 }
 function delCash(id){if(confirm('Eliminare questo movimento?')){S.cash=S.cash.filter(c=>c.id!==id);save();render()}}
+function payCalc(){
+  const n=num('f-amt')||0,g=num('f-gr')||0,de=$('#f-de');
+  if(de&&de.dataset&&de.dataset.auto!=='0'&&g>0)de.value=Math.round((g-n)*100)/100;
+  $('#f-pc').value=g>0?((g-n)/g*100).toFixed(2).replace('.',',')+' %':'';
+}
+function payCard(l){
+  const p=l.filter(t=>t.type==='in'&&t.pay);if(!p.length)return '';
+  const s=k=>p.reduce((a,t)=>a+(t[k]||0),0),R=(a,b)=>`<div class="row" style="padding:3px 0"><span class="mute">${a}</span><span>${b}</span></div>`,g=s('gross'),n=s('amount');
+  return `<div class="card"><b>Buste paga (${p.length})</b>${R('Netto',eur(n))}${R('Lordo',eur(g))}${R('Totale trattenute',eur(s('ded')))}${R('% trattenute',g?((g-n)/g*100).toFixed(2).replace('.',',')+'%':'—')}${R('Ore straordinario',s('otH').toLocaleString('it-IT'))}${R('€ straordinario',eur(s('otE')))}${R('TFR',eur(s('tfr')))}${R('Buoni pasto in busta',eur(s('bpm')))}</div>`;
+}
+function trend(l){
+  if(!l.length)return '';
+  const ds=l.map(t=>t.date).sort(),a=ds[0],b=ds[ds.length-1],span=(Date.parse(b)-Date.parse(a))/864e5,keys=[],lab={},multi=a.slice(0,4)!==b.slice(0,4);
+  if(span<=45){for(let t=Date.parse(a);t<=Date.parse(b);t+=864e5){const d=new Date(t),k=d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());keys.push(k);lab[k]=k.slice(8)+'/'+k.slice(5,7)}}
+  else{let [y,m]=a.split('-').map(Number);const [y2,m2]=b.split('-').map(Number);while(y<y2||(y===y2&&m<=m2)){const k=y+'-'+pad(m);keys.push(k);lab[k]=MN[m-1]+(multi?' '+String(y).slice(2):'');m++;if(m>12){m=1;y++}}}
+  const items=keys.map(k=>{const s=split(l.filter(t=>t.date.startsWith(k)));return {l:lab[k],a:Math.max(0,s.net),b:s.out}}),T=split(l),hi=l.some(t=>t.type==='in'),ho=l.some(t=>t.type==='out');
+  if(hi&&ho)return bars(items,'Entrate nette','Uscite',eur0(T.net),eur0(T.out));
+  if(ho)return bars(items.map(i=>({l:i.l,a:i.b})),'Uscite',null,eur0(T.out));
+  return bars(items.map(i=>({l:i.l,a:i.a})),'Entrate nette',null,eur0(T.net));
+}
+function cashAt(p,d){let b=0;ledger(p).forEach(x=>{if(x.date<=d)b=x.bal});return b}
+function chTog(k,v){const a=CH[k],i=a.indexOf(v);if(i<0)a.push(v);else a.splice(i,1);render()}
+function chSet(k,v){CH[k]=v;render()}
+function chDate(k,v){CH[k]=v;CH.rng='custom';render()}
+function chRng(r){
+  CH.rng=r;const d=new Date(),iso=x=>x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate());
+  if(r==='max'){CH.from='';CH.to=''}
+  else{const f=new Date(d);if(r==='1M')f.setMonth(f.getMonth()-1);else if(r==='3M')f.setMonth(f.getMonth()-3);else if(r==='6M')f.setMonth(f.getMonth()-6);else if(r==='1A')f.setFullYear(f.getFullYear()-1);else{f.setMonth(0);f.setDate(1)}CH.from=iso(f);CH.to=iso(d)}
+  render();
+}
+function mlines(p,SR){
+  if(!SR.length)return '<div class="empty">Scegli almeno una linea da mostrare.</div>';
+  const W=340,H=170,pl=4,pb=18,pt=14,t0=Date.parse(p[0].d),t1=Date.parse(p[p.length-1].d),vs=p.flatMap(q=>SR.map(s=>q[s.k])),mn=Math.min(...vs),mx=Math.max(...vs),L=p[p.length-1];
+  const x=d=>p.length<2||t1===t0?W/2-30:pl+8+(Date.parse(d)-t0)/(t1-t0)*(W-pl*2-72),y=v=>pt+(H-pt-pb)*(1-(mx===mn?.5:(v-mn)/(mx-mn)));
+  const lb=SR.map(s=>({s,y:y(L[s.k])})).sort((a,b)=>a.y-b.y);for(let i=1;i<lb.length;i++)if(lb[i].y-lb[i-1].y<10)lb[i].y=lb[i-1].y+10;
+  return `<div class="leg">${SR.map(s=>`<span><i style="background:${s.col}"></i>${s.n}: <b>${eur0(L[s.k])}</b></span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><text x="${pl}" y="9" font-size="9" fill="var(--mute)">${eur0(mx)}</text><text x="${pl}" y="${H-pb-3}" font-size="9" fill="var(--mute)">${eur0(mn)}</text><line x1="0" x2="${W}" y1="${H-pb}" y2="${H-pb}" stroke="var(--line)"/>
+  ${SR.map(s=>`<polyline points="${p.map(q=>x(q.d).toFixed(1)+','+y(q[s.k]).toFixed(1)).join(' ')}" fill="none" stroke="${s.col}" stroke-width="2" ${s.dash?'stroke-dasharray="4 3"':''}/>${p.map(q=>`<circle cx="${x(q.d).toFixed(1)}" cy="${y(q[s.k]).toFixed(1)}" r="2.5" fill="${s.col}"><title>${fd(q.d)} · ${s.n}: ${eur(q[s.k])}</title></circle>`).join('')}`).join('')}
+  ${lb.map(o=>`<text x="${(x(L.d)+6).toFixed(1)}" y="${(o.y+3).toFixed(1)}" font-size="9" font-weight="700" fill="${o.s.col}">${eur0(L[o.s.k])}</text>`).join('')}
+  <text x="${pl}" y="${H-4}" font-size="9" fill="var(--mute)">${fd(p[0].d)}</text><text x="${W-pl}" y="${H-4}" font-size="9" text-anchor="end" fill="var(--mute)">${fd(L.d)}</text></svg>`;
+}
+function chartHtml(){
+  let s=CH.scope;
+  if(!(s==='all'||(s[0]==='p'&&S.pacs[+s.slice(2)]!=null)||(s[0]==='a'&&S.inv.some(a=>a.id===s.slice(2)))))s=CH.scope='all';
+  let as=S.inv,ps=S.pacs;
+  if(s[0]==='p'){const p=S.pacs[+s.slice(2)];as=as.filter(a=>a.pac===p);ps=[p]}
+  else if(s[0]==='a'){as=as.filter(a=>a.id===s.slice(2));ps=[]}
+  if(s[0]!=='a')as=as.filter(a=>CH.types.includes(a.kind));
+  const fi=CH.from,to=CH.to;
+  let ds=[...new Set([...as.flatMap(a=>[...a.ops.map(o=>o.date),...(a.prices||[]).map(p=>p.date)]),...ps.flatMap(p=>ledger(p).map(x=>x.date))])].sort();
+  if(ds.length){if(fi&&fi>ds[0])ds.push(fi);if(to&&to>ds[0])ds.push(to);ds=[...new Set(ds)].sort().filter(d=>(!fi||d>=fi)&&(!to||d<=to))}
+  const pts=ds.map(d=>{let v=0,c=0;as.forEach(a=>{const p=pos(a,d),sr=series(a).filter(x=>x.date<=d),pr=sr.length?sr[sr.length-1].price:0;v+=p.q*pr*fac(a);c+=p.cost});const l=ps.reduce((q,p)=>q+cashAt(p,d),0);return {d,v,c,l,t:v+l}});
+  const SR=[{k:'v',n:'Controvalore',col:'var(--main)'},{k:'c',n:'Prezzo pagato',col:'var(--alt)'},{k:'l',n:'Liquidità',col:'var(--c3)'},{k:'t',n:'Totale (titoli + liquidità)',col:'var(--ink)',dash:1}].filter(x=>CH.ser.includes(x.k)&&!(s[0]==='a'&&(x.k==='l'||x.k==='t')));
+  const chip=(on,fn,l)=>`<button class="chip ${on?'on':''}" onclick="${fn}">${l}</button>`;
+  return `<label>Periodo</label><div class="chips">${['1M','3M','6M','1A','YTD','max'].map(r=>chip(CH.rng===r,`chRng('${r}')`,r==='max'?'Tutto':r)).join('')}</div>
+  <div class="fgrid"><div><label>Dal</label><input type="date" value="${CH.from}" onchange="chDate('from',this.value)"></div><div><label>Al</label><input type="date" value="${CH.to}" onchange="chDate('to',this.value)"></div></div>
+  <label>Cosa mostrare</label><select onchange="chSet('scope',this.value)"><option value="all" ${s==='all'?'selected':''}>Tutta la famiglia</option>${S.pacs.map((p,i)=>`<option value="p:${i}" ${s==='p:'+i?'selected':''}>${esc(p)}</option>`).join('')}${S.inv.length?`<optgroup label="Singolo titolo">${S.inv.map(a=>`<option value="a:${a.id}" ${s==='a:'+a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</optgroup>`:''}</select>
+  <label>Tipi di titolo</label><div class="chips">${CHT.map(k=>chip(CH.types.includes(k),`chTog('types','${k}')`,k)).join('')}</div>
+  <label>Linee del grafico</label><div class="chips">${[['v','Controvalore'],['c','Prezzo pagato'],['l','Liquidità'],['t','Totale']].map(([k,n])=>chip(CH.ser.includes(k),`chTog('ser','${k}')`,n)).join('')}</div>
+  ${pts.length?mlines(pts,SR):'<div class="empty">Nessun dato nell’intervallo scelto.</div>'}`;
+}
+const VM={gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
+const VC=[
+['🚗 Auto_Moto_Carburante',/benzina|carburante|gasolio|diesel|rifornimento|distributore|metano|\bgpl\b/],
+['🚗 AUTO_FORD_Altro',/\bford\b/],
+['🚗 Auto_Moto_Altro',/meccanico|gomme|assicurazione|revisione|autostrada|pedaggio|parcheggio|lavaggio|\bbollo\b|tagliando/],
+['🚗 Varie',/\btaxi\b|autobus|\bbus\b|\bmetro\b|trasporti/],
+['🏘️ CONDOMINIO AREA CORTILIVA',/cortil/],
+['🏠 CONDOMINIO',/condomini/],
+['🗑️ TARI',/\btari\b|rifiuti|spazzatura/],
+['💡 LUCE',/\bluce\b|elettric|\benel\b|corrente/],
+['🕯️ GAS',/\bgas\b/],
+['💧 ACQUA',/\bacqua\b/],
+['📞 TELEFONO',/telefon|cellulare|\btim\b|vodafone|iliad|\bwind\b|internet|fibra/],
+['🧷 BABY/Salute',/pediatra/],
+['🧦 BABY/Abbigliamento',/vestitin|tutina|\bbody\b/],
+['🍼 BABY/Care',/pannolin|\bbaby\b|bimbo|bimba|bambin|omogeneizzat|biberon|latte in polvere/],
+['🩺 SALUTE',/farmaci|medic|dentist|visita|ospedale|analisi|\bticket\b/],
+['🎁 REGALI',/regal/],
+['✈️ VIAGGI/VACANZE',/viagg|vacanz|hotel|albergo|\btreno\b|\bvolo\b|aere|biglietto/],
+['📈 INVESTIMENTI',/investiment|\betf\b|\bpac\b/],
+['💸 TASSE',/\btasse\b|imposta|irpef|\bimu\b/],
+['📖 ISTRUZIONE',/scuola|libri|\bcorso\b|universit|istruzione|\bretta\b/],
+['💅 CURA PERSONALE',/parrucchier|estetist|barbier|unghie|cosmetic|profumeri|capelli/],
+['👚 ABBIGLIAMENTO',/vestit|abbigliament|scarpe|maglia|giacca|pantaloni|jeans/],
+['🍝 CIBO/FUORI',/ristorant|pizz|\bbar\b|caff[eè]|colazione|\bpranzo\b|\bcena\b|trattoria|sushi|gelat|aperitivo|\bfuori\b/],
+['💻 HOBBY',/hobby|videogioc|cinema|\bgioco\b|giochi/],
+['🍲 SPESA',/spesa|supermercat|\bcoop\b|esselunga|conad|lidl|carrefour|eurospin|\bpam\b|despar|alimentar|\bmercato\b/]];
+function vDate(s){
+  const d=new Date(),iso=x=>x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate()),ago=n=>{const x=new Date(d);x.setDate(x.getDate()-n);return iso(x)};
+  let m;
+  if(/altro ?ieri/.test(s))return {date:ago(2),rest:s.replace(/l'?altro ?ieri/,' ')};
+  if(/\bieri\b/.test(s))return {date:ago(1),rest:s.replace(/\bieri\b/,' ')};
+  if(/\boggi\b/.test(s))return {date:ago(0),rest:s.replace(/\boggi\b/,' ')};
+  if(m=s.match(/(?:il\s+)?(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)(?:\s+(\d{4}))?/))
+    return {date:iso(new Date(+(m[3]||d.getFullYear()),VM[m[2]]-1,+m[1])),rest:s.replace(m[0],' ')};
+  if(m=s.match(/(?:il\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/)){
+    const y=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):d.getFullYear();
+    return {date:iso(new Date(y,+m[2]-1,+m[1])),rest:s.replace(m[0],' ')};
+  }
+  return {date:null,rest:s};
+}
+function voiceCard(){
+  return `<div class="card"><b>🎤 Detta la spesa</b><div class="mute" style="margin:4px 0 8px">Es. “45 euro supermercato Coop ieri”. Tocca Parla, oppure scrivi o detta nel campo con il microfono della tastiera.</div>
+  <input id="v-txt" placeholder="Es. 45 euro supermercato Coop ieri" onkeydown="if(event.key==='Enter')voiceFill(this.value)">
+  <div class="row" style="gap:8px"><button id="v-btn" style="flex:1" onclick="vStart()">🎤 Parla</button><button class="ghost" style="flex:1" onclick="voiceFill($('#v-txt').value)">Compila</button></div><div id="v-res" class="mute" style="margin-top:8px"></div></div>`;
+}
+function vStart(){
+  const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!R){alert('Il riconoscimento vocale non è disponibile su questo dispositivo: tocca il campo di testo e usa il microfono della tastiera.');return}
+  const r=new R();r.lang='it-IT';r.interimResults=false;r.maxAlternatives=1;
+  r.onresult=e=>{const t=e.results[0][0].transcript;if($('#v-txt')){$('#v-txt').value=t;voiceFill(t)}};
+  r.onerror=e=>{if($('#v-res'))$('#v-res').textContent='Non ho sentito bene ('+e.error+'). Riprova oppure scrivi nel campo.'};
+  r.onend=()=>{if($('#v-btn'))$('#v-btn').textContent='🎤 Parla'};
+  $('#v-btn').textContent='🎤 Ascolto…';r.start();
+}
+function voiceFill(raw){
+  raw=(raw||'').trim();if(!raw){$('#v-res').textContent='Scrivi o detta prima una frase.';return}
+  const s=raw.toLowerCase().replace(/[’]/g,"'"),D=vDate(s),inc=/\b(entrata|incasso|incassato|accredito|stipendio|assegno unico|auu)\b/.test(s);
+  const t=D.rest.replace(/(\d{1,3})\.(\d{3})(?!\d)/g,'$1$2').replace(/(\d+)\s*(?:euro|€)\s*e\s*(\d{1,2})\b/g,'$1.$2').replace(/(\d),(\d{1,2})\b/g,'$1.$2');
+  const nums=[...t.matchAll(/\d+(?:\.\d+)?/g)].map(x=>parseFloat(x[0]));
+  $('#f-type').value=inc?'in':'out';setCats();
+  let cat=null;
+  if(inc)cat=/assegno unico|\bauu\b/.test(s)?'AUU MY':/stipendio/.test(s)?(/\bzx\b/.test(s)?'Salary ZX':'Salary EH'):'Other EH&ZX';
+  else{const f=VC.find(([c,r])=>r.test(s));cat=f?f[0]:/buon[io] pasto/.test(s)?SPESA:null}
+  if(cat)$('#f-cat').value=cat;
+  catChg();
+  let amt=null,bpTxt='';
+  if(!inc&&cat===SPESA&&/buon[io] pasto/.test(s)&&nums.length){
+    const m=t.match(/(\d+(?:\.\d+)?)\s*(?:euro|€)?\s*(?:di|in|con)?\s*buon[io] pasto/)||t.match(/buon[io] pasto\s*(?:per|da|di)?\s*(\d+(?:\.\d+)?)/),tot=Math.max(...nums),bv=m?parseFloat(m[1]):tot,br=Math.max(0,Math.round((tot-bv)*100)/100);
+    $('#f-bpc').checked=true;$('#f-bpv').value=bv;$('#f-bpr').value=br||'';bpTog();bpSum();amt=bv+br;bpTxt=` · buoni ${eur(bv)} + resto ${eur(br)}`;
+  }else if(nums.length){
+    const m=t.match(/(\d+(?:\.\d+)?)\s*(?:euro|€|eur\b)/)||t.match(/€\s*(\d+(?:\.\d+)?)/);
+    amt=m?parseFloat(m[1]):nums[0];$('#f-amt').value=amt;payCalc();
+  }
+  if(D.date)$('#f-date').value=D.date;
+  $('#f-note').value=raw;
+  const w=[];if(amt==null)w.push('importo non trovato: inseriscilo a mano');if(!cat)w.push('categoria non riconosciuta: scegli a mano');
+  $('#v-res').innerHTML=`<b>${inc?'Entrata':'Spesa'}</b> · ${esc(cat||'—')} · ${amt!=null?eur(amt):'—'}${bpTxt}${D.date?' · '+fd(D.date):''}<br>${w.length?'⚠ '+w.join('; '):'Controlla i campi qui sotto e premi Salva.'}`;
+}
 const TABS=[['home','Riepilogo'],['add','Aggiungi'],['list','Movimenti'],['inv','Investimenti'],['settings','Impostazioni']];
 const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
   $('#app').innerHTML={home,add,list,inv:invest,settings}[tab]();
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
-  if(tab==='add'){setCats();if(ed){const t=S.tx.find(x=>x.id===ed.id);if(t){$('#f-type').value=t.type;setCats();$('#f-cat').value=t.cat;catChg();if(t.bp){$('#f-bpc').checked=true;bpTog();bpSum()}}}}
+  if(tab==='add'){setCats();if(ed){const t=S.tx.find(x=>x.id===ed.id);if(t){$('#f-type').value=t.type;setCats();const sel=$('#f-cat');if(sel.options&&![...sel.options].some(o=>o.value===t.cat))sel.innerHTML+=`<option>${esc(t.cat)}</option>`;sel.value=t.cat;catChg();if(t.bp){$('#f-bpc').checked=true;bpTog();bpSum()}if(t.pay)payCalc()}}}
   if(tab==='inv'&&iv.v==='form')invTog();
   if(tab==='inv'&&iv.v==='cform')cfTog();
 }
