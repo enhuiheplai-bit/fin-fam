@@ -730,7 +730,7 @@ const nwShift=d=>{const [y,m]=nwm.split('-').map(Number),dt=new Date(y,m-1+d,1);
 const mfmt=d=>MN[+d.slice(5,7)-1]+' '+d.slice(2,4);
 const act=(it,m)=>(!it.from||m>=it.from)&&(!it.until||m<=it.until);
 const pmo=m=>{const [y,mo]=m.split('-').map(Number),d=new Date(y,mo-2,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
-const DRIVE_CLIENT_ID='';
+const DRIVE_CLIENT_ID='41660131380-julf47m8fnifk0vmdcsmj5nsrjujr820.apps.googleusercontent.com';
 const DK='finfam-drive';
 let DR={};try{DR=JSON.parse(localStorage.getItem(DK))||{}}catch(e){}
 let drTok=null,drExp=0,drMsg='',drBusy=false,drTimer=null;
