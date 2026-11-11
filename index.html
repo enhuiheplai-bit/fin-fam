@@ -341,7 +341,8 @@ function settings(){
   return `<h1>Impostazioni</h1>${drCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
   <div class="card"><h2 style="margin-top:0">Scenario rata Agos</h2><label>Importo mensile (€)</label><input type="number" inputmode="decimal" value="${A.amt}" onchange="S.agos.amt=Math.max(0,parseFloat(this.value)||0);save();render()">
   <label>Ultimo mese in cui compare</label><input type="month" value="${A.until}" onchange="if(this.value){S.agos.until=this.value;save();render()}"></div>
-  <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>`;
+  <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>
+  <p class="mute" style="text-align:center"><a href="privacy.html" style="color:var(--main)">Informativa sulla privacy</a></p>`;
 }
 function renPac(i,v){v=v.trim();const o=S.pacs[i];if(!v||S.pacs.includes(v))return render();S.pacs[i]=v;S.inv.forEach(a=>{if(a.pac===o)a.pac=v});S.cash.forEach(c=>{if(c.pac===o)c.pac=v});save();render()}
 function addPac(){let n=S.pacs.length+1;while(S.pacs.includes('PAC'+n))n++;S.pacs.push('PAC'+n);save();render()}

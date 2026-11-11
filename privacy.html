@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Informativa sulla privacy · Fin-Fam</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f4f6f4;--card:#fff;--ink:#1b2a2f;--mute:#62747a;--line:#dce4e2;--main:#0f5c5c}
+@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1b2629;--ink:#e8efee;--mute:#93a5a9;--line:#2c3b3f;--main:#4fb3a9}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font:700 1.6rem Georgia,serif;margin:0 0 4px}
+h2{font-size:1.1rem;margin:28px 0 8px}
+p,li{margin:0 0 10px}
+ul{padding-left:20px;margin:0 0 10px}
+.mute{color:var(--mute);font-size:.9rem}
+a{color:var(--main)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:16px}
+</style>
+</head>
+<body>
+<main>
+<h1>Fin-Fam</h1>
+<p class="mute">Informativa sulla privacy · Ultimo aggiornamento: 11 novembre 2026</p>
+
+<div class="card">
+<p><b>Che cos’è Fin-Fam.</b> Fin-Fam è un’applicazione web personale per la gestione finanziaria familiare: permette di registrare entrate e spese, seguire gli investimenti (PAC, ETF, BTP), tenere traccia del patrimonio netto (Net Worth) e salvare una copia dei dati nel proprio Google Drive. È usata da un numero molto ristretto di persone, tutte conosciute personalmente da chi la gestisce, e non è offerta al pubblico.</p>
+<p><a href="./">Torna all’app</a></p>
+</div>
+
+<h2>Quali dati tratta l’app</h2>
+<p>I dati sono quelli che inserisci tu: movimenti, categorie, dati delle buste paga, operazioni di investimento, saldi dei conti e voci del patrimonio. Fin-Fam non raccoglie altre informazioni su di te e non usa strumenti di analisi, pubblicità o tracciamento.</p>
+
+<h2>Dove sono conservati</h2>
+<ul>
+<li><b>Sul tuo dispositivo:</b> i dati sono salvati nella memoria locale del browser o dell’app installata. Non vengono inviati a nessun server di Fin-Fam, perché Fin-Fam non ha server.</li>
+<li><b>Nel tuo Google Drive (facoltativo):</b> se scegli di collegare Google Drive, l’app crea e aggiorna un file chiamato <code>fin-fam-dati.json</code> nel tuo Drive e lo usa per sincronizzare i dati tra i tuoi dispositivi.</li>
+</ul>
+
+<h2>Accesso ai dati di Google</h2>
+<p>Quando colleghi Google Drive, l’app chiede un solo permesso: <code>https://www.googleapis.com/auth/drive.file</code>. Questo permesso consente all’app di vedere e modificare <b>soltanto i file che crea o che apri tramite l’app stessa</b>, cioè il file <code>fin-fam-dati.json</code>. L’app non può leggere, elencare o modificare gli altri tuoi file di Drive.</p>
+<p>L’accesso avviene direttamente dal tuo browser, tramite “Accedi con Google” (Google Identity Services). Il token di accesso resta solo nella memoria del tuo dispositivo e non viene inviato ad altri.</p>
+
+<h2>Condivisione dei dati</h2>
+<p>I dati non vengono venduti, ceduti, condivisi con terzi né usati per pubblicità o per addestrare modelli di intelligenza artificiale. Se condividi tu stesso il file <code>fin-fam-dati.json</code> con altri familiari dal tuo Google Drive, sono quelle persone ad avere accesso al suo contenuto.</p>
+<p>L’uso e il trasferimento delle informazioni ricevute dalle API di Google rispettano la <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, inclusi i requisiti di Limited Use.</p>
+
+<h2>I tuoi controlli</h2>
+<ul>
+<li><b>Scollegare Drive:</b> in Impostazioni → Google Drive puoi scollegare l’account in qualsiasi momento.</li>
+<li><b>Revocare l’accesso:</b> puoi revocare il permesso dalla pagina <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> del tuo account Google.</li>
+<li><b>Cancellare i dati:</b> puoi eliminare il file <code>fin-fam-dati.json</code> dal tuo Drive e svuotare i dati del sito dalle impostazioni del browser; puoi anche scaricare una copia dei dati dalla pagina Impostazioni dell’app.</li>
+</ul>
+
+<h2>Sicurezza</h2>
+<p>La connessione con Google usa HTTPS. I dati salvati sul dispositivo e su Drive sono protetti dalla sicurezza del tuo dispositivo e del tuo account Google: ti consigliamo di usare un blocco schermo e la verifica in due passaggi.</p>
+
+<h2>Modifiche a questa informativa</h2>
+<p>Se l’app cambia il modo in cui tratta i dati, questa pagina verrà aggiornata e la data in alto modificata.</p>
+</main>
+</body>
+</html>
