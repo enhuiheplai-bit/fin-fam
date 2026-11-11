@@ -70,7 +70,7 @@ if(!S.agos)S.agos={amt:580,until:'2028-11'};
 if(!S.nwd)S.nwd=nwDef0();
 if(!S.nws)S.nws={};
 S.inv.forEach(a=>{if(!a.pac)a.pac=S.pacs[0]});
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(DR.connected){DR.dirty=true;drSave();drAuto()}};
 const GR=[
 ['Self',['🍲 SPESA','🍝 CIBO/FUORI','👚 ABBIGLIAMENTO','💻 HOBBY','💅 CURA PERSONALE','📖 ISTRUZIONE','🩺 SALUTE','🎁 REGALI','✈️ VIAGGI/VACANZE','📈 INVESTIMENTI','💸 TASSE']],
 ['Baby',['🍼 BABY/Care','🧷 BABY/Salute','🧦 BABY/Abbigliamento']],
@@ -338,7 +338,7 @@ function delAsset(id){if(confirm('Eliminare il titolo e tutte le sue operazioni?
 /* ---------- impostazioni ---------- */
 function settings(){
   const A=S.agos;
-  return `<h1>Impostazioni</h1><div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
+  return `<h1>Impostazioni</h1>${drCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
   <div class="card"><h2 style="margin-top:0">Scenario rata Agos</h2><label>Importo mensile (€)</label><input type="number" inputmode="decimal" value="${A.amt}" onchange="S.agos.amt=Math.max(0,parseFloat(this.value)||0);save();render()">
   <label>Ultimo mese in cui compare</label><input type="month" value="${A.until}" onchange="if(this.value){S.agos.until=this.value;save();render()}"></div>
   <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>`;
@@ -631,10 +631,10 @@ function nwState(m){
   const pk=nwPrevKey(m),pv=pk?S.nws[pk]:null;
   return {v:{...(pv?pv.v:{}),...nwAuto(m)},fx:pv?pv.fx:null,rates:pv?{...pv.rates}:{tfrEH:26,tfrZX:26},saved:false,fromPrev:!!pv};
 }
-function nwTot(v,fx,rates){
-  const D=S.nwd,n=id=>+v[id]||0,f=it=>it.cur==='CNY'?(+fx||0):1,sm=(l,g)=>l.reduce((s,it)=>s+g(it),0),tfrn={};
-  D.tfr.forEach(it=>tfrn[it.id]=n(it.id)*(1-(rates&&rates[it.id]!=null?rates[it.id]:26)/100));
-  const stocks=sm(D.stocks,it=>n(it.id)),cash=sm(D.cash,it=>n(it.id)*f(it)),liqc=sm(D.cash.filter(c=>c.liq),it=>n(it.id)*f(it)),debts=sm(D.debts,it=>n(it.id)),prop=sm(D.prop,it=>n(it.id)),tn=Object.values(tfrn).reduce((a,b)=>a+b,0);
+function nwTot(v,fx,rates,m){
+  const D=S.nwd,n=id=>+v[id]||0,f=it=>it.cur==='CNY'?(+fx||0):1,sm=(l,g)=>l.reduce((s,it)=>s+g(it),0),A=k=>D[k].filter(it=>!m||act(it,m)),tfrn={};
+  A('tfr').forEach(it=>tfrn[it.id]=n(it.id)*(1-(rates&&rates[it.id]!=null?rates[it.id]:26)/100));
+  const stocks=sm(A('stocks'),it=>n(it.id)),cash=sm(A('cash'),it=>n(it.id)*f(it)),liqc=sm(A('cash').filter(c=>c.liq),it=>n(it.id)*f(it)),debts=sm(A('debts'),it=>n(it.id)),prop=sm(A('prop'),it=>n(it.id)),tn=Object.values(tfrn).reduce((a,b)=>a+b,0);
   return {stocks,cash,liqc,debts,prop,tfrn,tn,nw:stocks+cash+tn+prop-debts};
 }
 function nwRead(){
@@ -643,48 +643,51 @@ function nwRead(){
   return {v,fx:fe&&String(fe.value)!==''?parseFloat(fe.value):null,rates};
 }
 function nwLive(){
-  const {v,fx,rates}=nwRead(),T=nwTot(v,fx,rates),set=(id,x)=>{const e=$('#'+id);if(e)e.innerHTML=x};
+  const {v,fx,rates}=nwRead(),T=nwTot(v,fx,rates,nwm),set=(id,x)=>{const e=$('#'+id);if(e)e.innerHTML=x};
   set('nw-total',eur(T.nw));set('nws-stocks',eur(T.stocks));set('nws-cash',eur(T.cash));set('nws-liqc',eur(T.liqc));set('nws-debts',eur(T.debts));set('nws-prop',eur(T.prop));set('nws-tfr',eur(T.tn));
-  S.nwd.tfr.forEach(it=>set('nwn-'+it.id,eur(T.tfrn[it.id])));
-  S.nwd.cash.filter(c=>c.cur==='CNY').forEach(c=>set('nwe-'+c.id,'≈ '+eur((v[c.id]||0)*(fx||0))));
-  const w=$('#nw-warn');if(w)w.hidden=!(S.nwd.cash.some(c=>c.cur==='CNY'&&v[c.id])&&!fx);
+  S.nwd.tfr.forEach(it=>set('nwn-'+it.id,eur(T.tfrn[it.id]||0)));
+  S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm)).forEach(c=>set('nwe-'+c.id,'≈ '+eur((v[c.id]||0)*(fx||0))));
+  const w=$('#nw-warn');if(w)w.hidden=!(S.nwd.cash.some(c=>c.cur==='CNY'&&act(c,nwm)&&v[c.id])&&!fx);
 }
 function nwSave(){const {v,fx,rates}=nwRead();S.nws[nwm]={v,fx,rates,saved:true};save();render()}
 function nwRefresh(){Object.entries(nwAuto(nwm)).forEach(([id,x])=>{const e=$('#nw-'+id);if(e)e.value=x});nwLive()}
 function nwSeg(){return `<div class="seg"><button class="${nwv==='dash'?'on':''}" onclick="nwv='dash';render()">Dashboard</button><button class="${nwv==='data'?'on':''}" onclick="nwv='data';render()">Dati del mese</button></div>`}
 function nwTab(){return `<h1>Net Worth</h1>${nwv==='manage'?nwManage():nwSeg()+(nwv==='data'?nwData():nwDash())}`}
 function nwData(){
-  const st=nwState(nwm),D=S.nwd,val=id=>st.v[id]!=null?st.v[id]:'';
+  const st=nwState(nwm),D=S.nwd,A=k=>D[k].filter(it=>act(it,nwm)),val=id=>st.v[id]!=null?st.v[id]:'';
   const row=it=>`<div class="row nwr"><span>${esc(it.name)}${it.closed?' <span class="mute">(CHIUSO)</span>':''}${it.grp?` <span class="mute">· ${esc(it.grp)}</span>`:''}${it.cur==='CNY'?' <span class="mute">RMB</span>':''}${linkOf(it)?'':''}</span><span class="nwi"><input id="nw-${it.id}" type="number" inputmode="decimal" step="0.01" value="${val(it.id)}" oninput="nwLive()"></span></div>${it.cur==='CNY'?`<div class="mute" style="text-align:right" id="nwe-${it.id}"></div>`:''}`;
   const head=(t,id,sec)=>`<div class="row"><b>${t}</b><b id="${id}"></b></div>${sec?`<div style="text-align:right;margin:2px 0 6px"><button class="ghost" style="padding:4px 10px;font-size:.8rem" onclick="nwsec='${sec}';nwv='manage';render()">Gestisci voci</button></div>`:''}`;
   return `<div class="mnav"><button class="ghost" onclick="nwShift(-1)">‹</button><b>${mName(nwm)}</b><button class="ghost" onclick="nwShift(1)">›</button></div>
   <div class="card"><div class="mute">Net Worth del mese</div><div class="big" id="nw-total"></div><div class="mute" style="margin-top:4px">${st.saved?'<span class="in">✔ Mese salvato</span>':'⚠ Valori provvisori'+(st.fromPrev?' ripresi dal mese precedente salvato':'')+': modificali e premi “Salva mese”.'}</div></div>
-  <div class="card">${head('Stocks / ETF','nws-stocks','')}<div class="mute" style="margin-bottom:6px">Totale famiglia, ripreso dagli Investimenti.</div>${D.stocks.map(row).join('')}<button class="ghost" style="margin-top:6px" onclick="nwRefresh()">↻ Aggiorna da Investimenti</button><div class="mute" style="margin-top:6px">Se un titolo non si aggiorna da solo, collegalo agli Investimenti con “Gestisci voci”.</div><button class="ghost" style="margin-top:6px;padding:4px 10px;font-size:.8rem" onclick="nwsec='stocks';nwv='manage';render()">Gestisci voci</button></div>
+  <div class="card">${head('Stocks / ETF','nws-stocks','')}<div class="mute" style="margin-bottom:6px">Totale famiglia, ripreso dagli Investimenti.</div>${A('stocks').map(row).join('')}<button class="ghost" style="margin-top:6px" onclick="nwRefresh()">↻ Aggiorna da Investimenti</button><div class="mute" style="margin-top:6px">Se un titolo non si aggiorna da solo, collegalo agli Investimenti con “Gestisci voci”.</div><button class="ghost" style="margin-top:6px;padding:4px 10px;font-size:.8rem" onclick="nwsec='stocks';nwv='manage';render()">Gestisci voci</button></div>
   <div class="card">${head('Cash - Liquidity','nws-cash','cash')}
   <div class="row nwr"><span>Cambio: 1 RMB =</span><span class="nwi"><input id="nw-fx" type="number" inputmode="decimal" step="0.0001" value="${st.fx!=null?st.fx:''}" oninput="nwLive()"> €</span></div>
   <div id="nw-warn" class="out" hidden style="margin:4px 0">⚠ Inserisci il cambio RMB → € per includere i conti in RMB nei totali.</div>
-  ${D.cash.map(row).join('')}<div class="row" style="margin-top:6px"><span class="mute">di cui “Liquidità” (conti selezionati)</span><span id="nws-liqc"></span></div></div>
-  <div class="card">${head('Debiti','nws-debts','debts')}${D.debts.map(row).join('')}</div>
+  ${A('cash').map(row).join('')}<div class="row" style="margin-top:6px"><span class="mute">di cui “Liquidità” (conti selezionati)</span><span id="nws-liqc"></span></div></div>
+  <div class="card">${head('Debiti','nws-debts','debts')}${A('debts').map(row).join('')}</div>
   <div class="card">${head('TFR (netto, entra nel Net Worth)','nws-tfr','')}<div class="mute" style="margin-bottom:6px">Valore proposto = TFR precedente + TFR delle buste paga inserite.</div>
   ${D.tfr.map(it=>`${row(it)}<div class="row nwr"><span class="mute">Tasse ipotetiche %</span><span class="nwi"><input id="nw-r-${it.id}" type="number" inputmode="decimal" step="0.1" value="${st.rates&&st.rates[it.id]!=null?st.rates[it.id]:26}" oninput="nwLive()"></span></div><div class="row"><span>${esc(it.name)}_Netto</span><b id="nwn-${it.id}"></b></div>`).join('')}
   <button class="ghost" style="margin-top:6px" onclick="nwRefresh()">↻ Ricalcola da buste paga</button></div>
-  <div class="card">${head('Immobili','nws-prop','prop')}${D.prop.map(row).join('')}</div>
+  <div class="card">${head('Immobili','nws-prop','prop')}${A('prop').map(row).join('')}</div>
   <button style="width:100%" onclick="nwSave()">Salva mese</button>`;
 }
 function nwManage(){
   const sec=nwsec,L=S.nwd[sec],T={stocks:'Stocks / ETF',cash:'Cash - Liquidity',debts:'Debiti',prop:'Immobili'},sl=(v,l,s)=>`<option value="${v}" ${s?'selected':''}>${l}</option>`;
   return `<button class="ghost" onclick="nwv='data';render()">‹ Indietro</button><h1 style="margin-top:12px">Gestisci: ${T[sec]}</h1>
-  ${L.map((it,i)=>`<div class="card"><input value="${esc(it.name)}" onchange="nwEdit('${sec}',${i},'name',this.value)">
+  <div class="mnav"><button class="ghost" onclick="nwShift(-1)">‹</button><b>${mName(nwm)}</b><button class="ghost" onclick="nwShift(1)">›</button></div>
+  <div class="mute" style="margin-bottom:10px">Mese di riferimento. Le voci nuove partono da questo mese. “Chiudi” nasconde la voce da questo mese in poi e conserva lo storico.</div>
+  ${L.map((it,i)=>{const on=act(it,nwm);return `<div class="card" style="${on?'':'opacity:.65'}"><input value="${esc(it.name)}" onchange="nwEdit('${sec}',${i},'name',this.value)">
+  <div class="mute" style="margin-bottom:8px">${on?'✔ Attiva in questo mese':it.from&&nwm<it.from?'Non ancora attiva (parte da '+mName(it.from)+')':'Chiusa (ultimo mese: '+mName(it.until)+')'}</div>
   ${sec==='cash'?`<label>Valuta</label><select onchange="nwEdit('cash',${i},'cur',this.value)">${sl('EUR','Euro (€)',it.cur!=='CNY')}${sl('CNY','RMB (¥)',it.cur==='CNY')}</select>
-  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" style="width:auto;margin:0" ${it.liq?'checked':''} onchange="nwEdit('cash',${i},'liq',this.checked?1:0)"> Conta nella “Liquidità” del grafico</label>
-  <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:8px"><input type="checkbox" style="width:auto;margin:0" ${it.closed?'checked':''} onchange="nwEdit('cash',${i},'closed',this.checked?1:0)"> Conto chiuso</label>`:''}
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-bottom:10px"><input type="checkbox" style="width:auto;margin:0" ${it.liq?'checked':''} onchange="nwEdit('cash',${i},'liq',this.checked?1:0)"> Conta nella “Liquidità” del grafico</label>`:''}
   ${sec==='stocks'&&it.auto!=='liq'?`<label>Titolo collegato agli Investimenti</label><select onchange="nwEdit('stocks',${i},'link',this.value)">${sl('','Automatico (stesso nome)',!it.link)}${S.inv.map(a=>sl(a.id,esc(a.name),it.link===a.id)).join('')}</select>`:''}
-  ${it.auto==='liq'?'':`<button class="ghost" style="margin-top:10px;color:var(--out)" onclick="nwDel('${sec}',${i})">Elimina</button>`}</div>`).join('')}
-  ${sec==='stocks'?'':`<button style="width:100%" onclick="nwAdd('${sec}')">+ Aggiungi voce</button>`}`;
+  ${it.auto==='liq'?'':`<div class="fgrid"><div><label>Attiva dal</label><input type="month" value="${it.from||''}" onchange="nwEdit('${sec}',${i},'from',this.value)"></div><div><label>Ultimo mese</label><input type="month" value="${it.until||''}" onchange="nwEdit('${sec}',${i},'until',this.value)"></div></div>
+  <div class="row" style="gap:8px">${it.until?`<button class="ghost" style="flex:1" onclick="nwReopen('${sec}',${i})">Riapri</button>`:`<button class="ghost" style="flex:1" onclick="nwClose('${sec}',${i})">Chiudi da ${mName(nwm)}</button>`}<button class="ghost" style="flex:1;color:var(--out)" onclick="nwDel('${sec}',${i})">Elimina</button></div>`}</div>`}).join('')}
+  <button style="width:100%" onclick="nwAdd('${sec}')">+ Aggiungi voce da ${mName(nwm)}</button>`;
 }
 function nwEdit(sec,i,k,v){S.nwd[sec][i][k]=v;save();render()}
-function nwAdd(sec){S.nwd[sec].push({id:uid(),name:'Nuova voce',cur:'EUR'});save();render()}
-function nwDel(sec,i){if(confirm('Eliminare questa voce? I mesi già salvati non la includeranno più nei totali (se il conto è solo chiuso, usa “Conto chiuso”).')){S.nwd[sec].splice(i,1);save();render()}}
+function nwAdd(sec){S.nwd[sec].push({id:uid(),name:'Nuova voce',cur:'EUR',from:nwm});save();render()}
+function nwDel(sec,i){if(confirm('ATTENZIONE: eliminando la voce perdi anche i suoi valori in TUTTI i mesi già salvati. Per un conto chiuso usa “Chiudi”. Eliminare comunque?')){S.nwd[sec].splice(i,1);save();render()}}
 function nwSer(){
   const A=[['nw','Net Worth'],['stocks','Stocks / ETF'],['cash','Cash'],['tfrn','TFR netto'],['prop','Immobili'],['debts','Debiti']],
   B=[['fam','Family (entrate)'],['sEH','Salary EH'],['sZX','Salary ZX'],['oth','Other EH&ZX'],['auu','AUU MY'],['pas','Passive Int'],['exp','Expenses'],['liqc','Liquidità conti'],...S.pacs.flatMap((p,i)=>[['pv'+i,p+' controvalore'],['pc'+i,p+' prezzo pagato']]),...S.nwd.tfr.map(it=>['t_'+it.id,it.name+' - tas'])];
@@ -695,7 +698,7 @@ function nwPts(){
   if(NS.rng!=='max')ms=ms.slice(-(+NS.rng));
   return ms.map(m=>{
     const o={d:m+'-01'},sv=S.nws[m],tx=real().filter(t=>t.date.startsWith(m)),inn=c=>tx.filter(t=>t.type==='in'&&t.cat===c).reduce(sum,0),end=m+'-31';
-    if(sv&&sv.saved){const T=nwTot(sv.v,sv.fx,sv.rates);Object.assign(o,{nw:T.nw,stocks:T.stocks,cash:T.cash,tfrn:T.tn,prop:T.prop,debts:T.debts,liqc:T.liqc});S.nwd.tfr.forEach(it=>o['t_'+it.id]=T.tfrn[it.id])}
+    if(sv&&sv.saved){const T=nwTot(sv.v,sv.fx,sv.rates,m);Object.assign(o,{nw:T.nw,stocks:T.stocks,cash:T.cash,tfrn:T.tn,prop:T.prop,debts:T.debts,liqc:T.liqc});S.nwd.tfr.forEach(it=>o['t_'+it.id]=T.tfrn[it.id])}
     o.sEH=inn('Salary EH');o.sZX=inn('Salary ZX');o.oth=inn('Other EH&ZX');o.auu=inn('AUU MY');
     o.pas=S.inv.flatMap(a=>a.ops.filter(x=>x.type==='div'&&x.date.startsWith(m))).reduce((s,x)=>s+x.amount,0)+inn('Passive Int');
     o.fam=o.sEH+o.sZX+o.oth+o.auu+o.pas;o.exp=tx.filter(t=>t.type==='out').reduce(sum,0);
@@ -707,7 +710,7 @@ function nsTog(k){const i=NS.ser.indexOf(k);if(i<0)NS.ser.push(k);else NS.ser.sp
 function nwDash(){
   const ks=Object.keys(S.nws).filter(k=>S.nws[k].saved).sort();
   if(!ks.length)return `<div class="card empty">Nessun mese salvato.<br>Apri “Dati del mese”, controlla i valori proposti e premi “Salva mese”.<br><br><button onclick="nwv='data';render()">Compila ${mName(nwm)}</button></div>`;
-  const get=k=>({k,T:nwTot(S.nws[k].v,S.nws[k].fx,S.nws[k].rates)}),L=get(ks[ks.length-1]),P=ks.length>1?get(ks[ks.length-2]):null,all=nwSer(),SR=all.filter(s=>NS.ser.includes(s.k));
+  const get=k=>({k,T:nwTot(S.nws[k].v,S.nws[k].fx,S.nws[k].rates,k)}),L=get(ks[ks.length-1]),P=ks.length>1?get(ks[ks.length-2]):null,all=nwSer(),SR=all.filter(s=>NS.ser.includes(s.k));
   const pts=nwPts().filter(q=>SR.some(s=>q[s.k]!=null)),chip=s=>`<button class="chip ${NS.ser.includes(s.k)?'on':''}" style="border-left:5px solid ${s.col}" onclick="nsTog('${s.k}')">${s.n}</button>`;
   return `<div class="card"><div class="mute">Net Worth · ${mName(L.k)}</div><div class="big">${eur(L.T.nw)}</div>${P?`<div class="${L.T.nw>=P.T.nw?'in':'out'}">${sg(L.T.nw-P.T.nw)} <span class="mute">rispetto a ${mName(P.k)}</span></div>`:''}
   <div class="mute" style="margin-top:6px">Stocks/ETF ${eur(L.T.stocks)} · Cash ${eur(L.T.cash)} · TFR netto ${eur(L.T.tn)} · Immobili ${eur(L.T.prop)} · Debiti ${eur(L.T.debts)}</div></div>
@@ -724,17 +727,121 @@ const r2=v=>Math.round((v||0)*100)/100;
 const linkOf=it=>S.inv.find(a=>a.id===it.link)||(!it.link&&S.inv.find(a=>a.name.trim().toLowerCase()===it.name.trim().toLowerCase()))||null;
 const nwShift=d=>{const [y,m]=nwm.split('-').map(Number),dt=new Date(y,m-1+d,1);nwm=dt.getFullYear()+'-'+pad(dt.getMonth()+1);render()};
 const mfmt=d=>MN[+d.slice(5,7)-1]+' '+d.slice(2,4);
+const act=(it,m)=>(!it.from||m>=it.from)&&(!it.until||m<=it.until);
+const pmo=m=>{const [y,mo]=m.split('-').map(Number),d=new Date(y,mo-2,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+const DRIVE_CLIENT_ID='';
+const DK='finfam-drive';
+let DR={};try{DR=JSON.parse(localStorage.getItem(DK))||{}}catch(e){}
+let drTok=null,drExp=0,drMsg='',drBusy=false,drTimer=null;
+const drCid=()=>DRIVE_CLIENT_ID||DR.cid||'';
+const drSave=()=>{try{localStorage.setItem(DK,JSON.stringify(DR))}catch(e){}};
+function normS(){
+  if(!S||!S.tx)S={tx:[]};
+  if(!S.inv)S.inv=[];if(!S.pacs)S.pacs=['PAC1','PAC2'];if(!S.cash)S.cash=[];
+  S.inv.forEach(a=>{if(!a.pac)a.pac=S.pacs[0]});
+  if(!S.agos)S.agos={amt:580,until:'2028-11'};if(!S.nwd)S.nwd=nwDef0();if(!S.nws)S.nws={};
+  nwMig();
+}
+function nwMig(){['stocks','cash','debts','prop'].forEach(k=>(S.nwd[k]||[]).forEach(it=>{if(it.closed){if(!it.until)it.until=pmo(today().slice(0,7));delete it.closed}}))}
+function nwClose(sec,i){const it=S.nwd[sec][i];if(confirm('Chiudere “'+it.name+'” da '+mName(nwm)+'? Da questo mese non comparirà più, ma lo storico dei mesi precedenti resta.')){it.until=pmo(nwm);save();render()}}
+function nwReopen(sec,i){delete S.nwd[sec][i].until;save();render()}
+function drLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=()=>res();s.onerror=()=>rej(new Error('Impossibile caricare Google (sei offline?)'));document.head.appendChild(s)})}
+async function drAuth(){
+  if(drTok&&Date.now()<drExp-60000)return drTok;
+  const cid=drCid();if(!cid)throw new Error('Manca il Client ID di Google.');
+  await drLoad();
+  return new Promise((res,rej)=>{
+    const c=google.accounts.oauth2.initTokenClient({client_id:cid,scope:'https://www.googleapis.com/auth/drive.file',
+      callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));drTok=r.access_token;drExp=Date.now()+(+r.expires_in||3600)*1000;DR.connected=true;drSave();res(drTok)},
+      error_callback:e=>rej(new Error(e&&e.type?e.type:'accesso annullato'))});
+    c.requestAccessToken({prompt:DR.connected?'':'consent'});
+  });
+}
+async function drApi(url,opt){
+  opt=opt||{};const t=await drAuth(),r=await fetch(url,{...opt,headers:{Authorization:'Bearer '+t,...(opt.headers||{})}});
+  if(!r.ok){const tx=await r.text();throw new Error('Drive '+r.status+': '+String(tx).slice(0,140))}
+  return r;
+}
+async function drFind(){
+  if(DR.fileId){try{const j=await (await drApi('https://www.googleapis.com/drive/v3/files/'+DR.fileId+'?fields=id,modifiedTime,trashed')).json();if(!j.trashed)return j}catch(e){if(!/ 404/.test(e.message))throw e}}
+  const j=await (await drApi('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name='fin-fam-dati.json' and trashed=false")+'&fields='+encodeURIComponent('files(id,modifiedTime)')+'&orderBy='+encodeURIComponent('modifiedTime desc'))).json();
+  return j.files&&j.files[0]||null;
+}
+async function drPut(){
+  const body=JSON.stringify({app:'fin-fam',v:1,savedAt:new Date().toISOString(),data:S});let f=await drFind();
+  if(!f){
+    const bd='ffb'+Date.now(),meta=JSON.stringify({name:'fin-fam-dati.json',mimeType:'application/json'});
+    f=await (await drApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`})).json();
+  }else f=await (await drApi('https://www.googleapis.com/upload/drive/v3/files/'+f.id+'?uploadType=media&fields=id,modifiedTime',{method:'PATCH',headers:{'Content-Type':'application/json'},body})).json();
+  DR.fileId=f.id;DR.lastMod=f.modifiedTime;DR.lastSync=Date.now();DR.dirty=false;drSave();return f;
+}
+async function drGet(f){
+  const j=await (await drApi('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media')).json(),d=j&&j.data?j.data:j;
+  if(!d||!d.tx)throw new Error('il file su Drive non è nel formato atteso');
+  try{localStorage.setItem('finfam-backup-'+Date.now(),JSON.stringify(S));const ks=Object.keys(localStorage).filter(k=>k.startsWith('finfam-backup-')).sort();while(ks.length>3)localStorage.removeItem(ks.shift())}catch(e){}
+  S=d;normS();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  DR.fileId=f.id;DR.lastMod=f.modifiedTime;DR.lastSync=Date.now();DR.dirty=false;drSave();
+}
+function drUi(){if(tab==='settings')render()}
+function drAuto(){clearTimeout(drTimer);if(!drTok||Date.now()>drExp-60000)return;drTimer=setTimeout(()=>drSync(),4000)}
+async function drSync(){
+  if(drBusy)return;drBusy=true;drMsg='Sincronizzo…';drUi();
+  try{
+    const f=await drFind();
+    if(!f){await drPut();drMsg='File creato su Drive e dati caricati ✔'}
+    else if(!DR.lastMod){
+      if(confirm('Su Drive esiste già un file dati. OK = SCARICA e sostituisci i dati di questo dispositivo. Annulla = non fare nulla.')){await drGet(f);drMsg='Dati scaricati da Drive ✔'}else drMsg='Sincronizzazione annullata.';
+    }else{
+      const rn=f.modifiedTime!==DR.lastMod;
+      if(rn&&DR.dirty)drMsg='⚠ Conflitto: Drive e questo dispositivo hanno entrambi modifiche nuove. Scegli “Scarica” o “Carica”.';
+      else if(rn){await drGet(f);drMsg='Scaricati i dati più recenti da Drive ✔'}
+      else if(DR.dirty){await drPut();drMsg='Dati caricati su Drive ✔'}
+      else drMsg='Già aggiornato ✔';
+    }
+  }catch(e){drMsg='Errore: '+e.message}
+  drBusy=false;drUi();
+}
+async function drPull(){
+  try{const f=await drFind();if(!f){alert('Su Drive non c’è ancora nessun file.');return}
+    if(!confirm('Sostituire i dati di questo dispositivo con quelli di Drive? Una copia dei dati attuali resta salvata sul dispositivo.'))return;
+    await drGet(f);drMsg='Dati scaricati da Drive ✔'}catch(e){drMsg='Errore: '+e.message}
+  drUi();
+}
+async function drPush(){
+  if(!confirm('Sostituire il file su Drive con i dati di questo dispositivo? (Drive conserva comunque le versioni precedenti del file.)'))return;
+  try{await drPut();drMsg='Dati caricati su Drive ✔'}catch(e){drMsg='Errore: '+e.message}
+  drUi();
+}
+function drConnect(){drAuth().then(()=>drSync()).catch(e=>{drMsg='Errore: '+e.message;drUi()})}
+function drDisconnect(){
+  if(!confirm('Scollegare Google Drive da questo dispositivo? I dati restano qui e sul tuo Drive.'))return;
+  try{if(drTok&&window.google)google.accounts.oauth2.revoke(drTok)}catch(e){}
+  drTok=null;DR={cid:DR.cid};drSave();drMsg='';render();
+}
+function drBar(){return `<div class="card" style="padding:8px 12px;border-color:var(--alt);cursor:pointer" onclick="go('settings')">☁ Modifiche non ancora su Drive · tocca per sincronizzare</div>`}
+function drCard(){
+  const cid=drCid(),T=DR.lastSync?new Date(DR.lastSync).toLocaleString('it-IT'):'mai';
+  return `<div class="card"><h2 style="margin-top:0">☁ Google Drive</h2>
+  ${DRIVE_CLIENT_ID?'':`<label>Client ID di Google</label><input value="${esc(DR.cid||'')}" placeholder="xxxx.apps.googleusercontent.com" onchange="DR.cid=this.value.trim();drSave();render()">`}
+  <div class="mute" style="margin-bottom:8px">${DR.connected?`Collegato · ultimo sync: ${T}${DR.dirty?' · <span class="out">modifiche non ancora caricate</span>':''}`:'Non collegato'}</div>
+  ${drMsg?`<div style="margin-bottom:8px">${esc(drMsg)}</div>`:''}
+  ${DR.connected?`<button style="width:100%" onclick="drSync()" ${drBusy?'disabled':''}>↻ Sincronizza</button>
+  <div class="row" style="gap:8px;margin-top:8px"><button class="ghost" style="flex:1" onclick="drPull()">⬇ Scarica</button><button class="ghost" style="flex:1" onclick="drPush()">⬆ Carica</button></div>
+  <button class="ghost" style="width:100%;margin-top:8px" onclick="drDisconnect()">Scollega</button>`
+  :`<button style="width:100%" onclick="drConnect()" ${cid?'':'disabled'}>Collega Google Drive</button>${cid?'':'<div class="mute" style="margin-top:6px">Inserisci prima il Client ID.</div>'}`}
+  <div class="mute" style="margin-top:8px">Il file “fin-fam-dati.json” viene salvato nel tuo Drive: l’app vede solo questo file.</div></div>`;
+}
 const TABS=[['home','Riepilogo','🏠'],['add','Aggiungi','➕'],['list','Movimenti','📋'],['inv','Investimenti','📈'],['nw','Net Worth','💎'],['settings','Impost.','⚙️']];
 const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
-  $('#app').innerHTML={home,add,list,inv:invest,nw:nwTab,settings}[tab]();
+  $('#app').innerHTML=(DR.connected&&DR.dirty?drBar():'')+{home,add,list,inv:invest,nw:nwTab,settings}[tab]();
   $('#nav').innerHTML=TABS.map(([k,l,ic])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')"><span>${ic}</span>${l}</button>`).join('');
   if(tab==='add'){setCats();if(ed){const t=S.tx.find(x=>x.id===ed.id);if(t){$('#f-type').value=t.type;setCats();const sel=$('#f-cat');if(sel.options&&![...sel.options].some(o=>o.value===t.cat))sel.innerHTML+=`<option>${esc(t.cat)}</option>`;sel.value=t.cat;catChg();if(t.bp){$('#f-bpc').checked=true;bpTog();bpSum()}if(t.pay)payCalc()}}}
   if(tab==='inv'&&iv.v==='form')invTog();
   if(tab==='inv'&&iv.v==='cform')cfTog();
   if(tab==='nw'&&nwv==='data')nwLive();
 }
-render();
+normS();render();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
