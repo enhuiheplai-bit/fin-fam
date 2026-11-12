@@ -628,60 +628,66 @@ function nwAuto(m){
   return v;
 }
 function nwState(m){
-  const sv=S.nws[m];if(sv&&sv.saved)return {...sv,fromPrev:false};
+  const sv=S.nws[m];if(sv&&sv.saved)return {...sv,fxi:fxiOf(sv),fromPrev:false};
   const pk=nwPrevKey(m),pv=pk?S.nws[pk]:null;
-  return {v:{...(pv?pv.v:{}),...nwAuto(m)},fx:pv?pv.fx:null,rates:pv?{...pv.rates}:{tfrEH:26,tfrZX:26},saved:false,fromPrev:!!pv};
+  return {v:{...(pv?pv.v:{})},fxi:pv?fxiOf(pv):{},rates:pv?{...pv.rates}:{tfrEH:26,tfrZX:26},saved:false,fromPrev:!!pv};
 }
-function nwTot(v,fx,rates,m){
-  const D=S.nwd,n=id=>+v[id]||0,f=it=>it.cur==='CNY'?(+fx||0):1,sm=(l,g)=>l.reduce((s,it)=>s+g(it),0),A=k=>D[k].filter(it=>!m||act(it,m)),tfrn={};
-  A('tfr').forEach(it=>tfrn[it.id]=n(it.id)*(1-(rates&&rates[it.id]!=null?rates[it.id]:26)/100));
-  const stocks=sm(A('stocks'),it=>n(it.id)),cash=sm(A('cash'),it=>n(it.id)*f(it)),liqc=sm(A('cash').filter(c=>c.liq),it=>n(it.id)*f(it)),debts=sm(A('debts'),it=>n(it.id)),prop=sm(A('prop'),it=>n(it.id)),tn=Object.values(tfrn).reduce((a,b)=>a+b,0);
-  return {stocks,cash,liqc,debts,prop,tfrn,tn,nw:stocks+cash+tn+prop-debts};
+function nwTot(sn,m){
+  sn=sn||{};const v=sn.v||{},rates=sn.rates||{},D=S.nwd,n=id=>+v[id]||0,A=k=>D[k].filter(it=>act(it,m)),
+  fx=it=>it.cur==='CNY'?(sn.fxi&&sn.fxi[it.id]!=null&&sn.fxi[it.id]!==''?+sn.fxi[it.id]:(+sn.fx||0)):1,
+  sm=(l,g)=>l.reduce((s,it)=>s+g(it),0),tfr={},tfrn={},sv=it=>{const a=stockAuto(it,m);return a!=null?a:n(it.id)};
+  A('tfr').forEach(it=>{tfr[it.id]=tfrAt(it,m);tfrn[it.id]=tfr[it.id]*(1-(rates[it.id]!=null?rates[it.id]:26)/100)});
+  const stocks=sm(A('stocks'),sv),cash=sm(A('cash'),it=>n(it.id)*fx(it)),liqc=sm(A('cash').filter(c=>c.liq),it=>n(it.id)*fx(it)),debts=sm(A('debts'),it=>n(it.id)),prop=sm(A('prop'),it=>n(it.id)),tn=Object.values(tfrn).reduce((a,b)=>a+b,0);
+  return {stocks,cash,liqc,debts,prop,tfr,tfrn,tn,nw:stocks+cash+tn+prop-debts};
 }
 function nwRead(){
-  const v={};['stocks','cash','debts','tfr','prop'].forEach(k=>S.nwd[k].forEach(it=>{const e=$('#nw-'+it.id);if(e&&String(e.value)!=='')v[it.id]=parseFloat(e.value)}));
-  const fe=$('#nw-fx'),rates={};S.nwd.tfr.forEach(it=>{const e=$('#nw-r-'+it.id);rates[it.id]=e&&String(e.value)!==''?parseFloat(e.value):26});
-  return {v,fx:fe&&String(fe.value)!==''?parseFloat(fe.value):null,rates};
+  const v={},fxi={},rates={};
+  ['stocks','cash','debts','prop'].forEach(k=>S.nwd[k].forEach(it=>{const e=$('#nw-'+it.id);if(e&&String(e.value)!=='')v[it.id]=parseFloat(e.value);const f=$('#nw-fx-'+it.id);if(f&&String(f.value)!=='')fxi[it.id]=parseFloat(f.value)}));
+  S.nwd.tfr.forEach(it=>{const e=$('#nw-r-'+it.id);rates[it.id]=e&&String(e.value)!==''?parseFloat(e.value):26});
+  return {v,fxi,rates};
 }
 function nwLive(){
-  const {v,fx,rates}=nwRead(),T=nwTot(v,fx,rates,nwm),set=(id,x)=>{const e=$('#'+id);if(e)e.innerHTML=x};
+  const sn=nwRead(),T=nwTot(sn,nwm),set=(id,x)=>{const e=$('#'+id);if(e)e.innerHTML=x};
   set('nw-total',eur(T.nw));set('nws-stocks',eur(T.stocks));set('nws-cash',eur(T.cash));set('nws-liqc',eur(T.liqc));set('nws-debts',eur(T.debts));set('nws-prop',eur(T.prop));set('nws-tfr',eur(T.tn));
-  S.nwd.tfr.forEach(it=>set('nwn-'+it.id,eur(T.tfrn[it.id]||0)));
-  S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm)).forEach(c=>set('nwe-'+c.id,'≈ '+eur((v[c.id]||0)*(fx||0))));
-  const w=$('#nw-warn');if(w)w.hidden=!(S.nwd.cash.some(c=>c.cur==='CNY'&&act(c,nwm)&&v[c.id])&&!fx);
+  S.nwd.tfr.forEach(it=>{set('nwt-'+it.id,eur(T.tfr[it.id]||0));set('nwn-'+it.id,eur(T.tfrn[it.id]||0))});
+  const cn=S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm));
+  cn.forEach(c=>set('nwe-'+c.id,'≈ '+eur((sn.v[c.id]||0)*(+sn.fxi[c.id]||0))));
+  const w=$('#nw-warn');if(w)w.hidden=!cn.some(c=>sn.v[c.id]&&!(+sn.fxi[c.id]>0));
 }
-function nwSave(){const {v,fx,rates}=nwRead();S.nws[nwm]={v,fx,rates,saved:true};save();render()}
+function nwSave(){S.nws[nwm]={...nwRead(),saved:true};save();render()}
 function nwRefresh(){Object.entries(nwAuto(nwm)).forEach(([id,x])=>{const e=$('#nw-'+id);if(e)e.value=x});nwLive()}
 function nwSeg(){return `<div class="seg"><button class="${nwv==='dash'?'on':''}" onclick="nwv='dash';render()">Dashboard</button><button class="${nwv==='data'?'on':''}" onclick="nwv='data';render()">Dati del mese</button></div>`}
 function nwTab(){return `<h1>Net Worth</h1>${nwv==='manage'?nwManage():nwSeg()+(nwv==='data'?nwData():nwDash())}`}
 function nwData(){
   const st=nwState(nwm),D=S.nwd,A=k=>D[k].filter(it=>act(it,nwm)),val=id=>st.v[id]!=null?st.v[id]:'';
-  const row=it=>`<div class="row nwr"><span>${esc(it.name)}${it.closed?' <span class="mute">(CHIUSO)</span>':''}${it.grp?` <span class="mute">· ${esc(it.grp)}</span>`:''}${it.cur==='CNY'?' <span class="mute">RMB</span>':''}${linkOf(it)?'':''}</span><span class="nwi"><input id="nw-${it.id}" type="number" inputmode="decimal" step="0.01" value="${val(it.id)}" oninput="nwLive()"></span></div>${it.cur==='CNY'?`<div class="mute" style="text-align:right" id="nwe-${it.id}"></div>`:''}`;
+  const tag=it=>`${it.grp?` <span class="mute">· ${esc(it.grp)}</span>`:''}${it.cur==='CNY'?' <span class="mute">RMB</span>':''}`;
+  const row=it=>`<div class="row nwr"><span>${esc(it.name)}${tag(it)}</span><span class="nwi"><input id="nw-${it.id}" type="number" inputmode="decimal" step="0.01" value="${val(it.id)}" oninput="nwLive()"></span></div>${it.cur==='CNY'?`<div class="row nwr" style="justify-content:flex-end;gap:8px"><span class="mute">cambio</span><input id="nw-fx-${it.id}" type="number" inputmode="decimal" step="0.0001" style="width:96px;margin:2px 0;text-align:right" value="${st.fxi[it.id]!=null?st.fxi[it.id]:''}" oninput="nwLive()"><span class="mute" id="nwe-${it.id}" style="min-width:96px;text-align:right"></span></div>`:''}`;
+  const srow=it=>{const a=stockAuto(it,nwm);return a==null?row(it):`<div class="row nwr"><span>${esc(it.name)}${tag(it)} <span class="mute">· automatico</span></span><b>${eur(a)}</b></div>`};
   const head=(t,id,sec)=>`<div class="row"><b>${t}</b><b id="${id}"></b></div>${sec?`<div style="text-align:right;margin:2px 0 6px"><button class="ghost" style="padding:4px 10px;font-size:.8rem" onclick="nwsec='${sec}';nwv='manage';render()">Gestisci voci</button></div>`:''}`;
   return `<div class="mnav"><button class="ghost" onclick="nwShift(-1)">‹</button><b>${mName(nwm)}</b><button class="ghost" onclick="nwShift(1)">›</button></div>
-  <div class="card"><div class="mute">Net Worth del mese</div><div class="big" id="nw-total"></div><div class="mute" style="margin-top:4px">${st.saved?'<span class="in">✔ Mese salvato</span>':'⚠ Valori provvisori'+(st.fromPrev?' ripresi dal mese precedente salvato':'')+': modificali e premi “Salva mese”.'}</div></div>
-  <div class="card">${head('Stocks / ETF','nws-stocks','')}<div class="mute" style="margin-bottom:6px">Totale famiglia, ripreso dagli Investimenti.</div>${A('stocks').map(row).join('')}<button class="ghost" style="margin-top:6px" onclick="nwRefresh()">↻ Aggiorna da Investimenti</button><div class="mute" style="margin-top:6px">Se un titolo non si aggiorna da solo, collegalo agli Investimenti con “Gestisci voci”.</div><button class="ghost" style="margin-top:6px;padding:4px 10px;font-size:.8rem" onclick="nwsec='stocks';nwv='manage';render()">Gestisci voci</button></div>
+  <div class="card"><div class="mute">Net Worth del mese</div><div class="big" id="nw-total"></div><div class="mute" style="margin-top:4px">${st.saved?'<span class="in">✔ Mese salvato</span>':'⚠ Valori provvisori'+(st.fromPrev?' ripresi dal mese precedente salvato':'')+': aggiorna importi e cambi e premi “Salva mese”.'}</div></div>
+  <div class="card">${head('Stocks / ETF','nws-stocks','stocks')}<div class="mute" style="margin-bottom:6px">Calcolato in automatico dagli Investimenti: i titoli con lo stesso nome di tutti i PAC vengono sommati. Non devi compilare nulla.</div>${A('stocks').map(srow).join('')}</div>
   <div class="card">${head('Cash - Liquidity','nws-cash','cash')}
-  <div class="row nwr"><span>Cambio: 1 RMB =</span><span class="nwi"><input id="nw-fx" type="number" inputmode="decimal" step="0.0001" value="${st.fx!=null?st.fx:''}" oninput="nwLive()"> €</span></div>
-  <div id="nw-warn" class="out" hidden style="margin:4px 0">⚠ Inserisci il cambio RMB → € per includere i conti in RMB nei totali.</div>
+  <div class="row nwr"><span class="mute">Stesso cambio per tutti i conti RMB</span><span class="nwi"><input id="nw-fxall" type="number" inputmode="decimal" step="0.0001" style="width:90px"> <button class="ghost" style="padding:4px 10px;font-size:.8rem" onclick="nwApplyFx()">Applica</button></span></div>
+  <div id="nw-warn" class="out" hidden style="margin:4px 0">⚠ Inserisci il cambio per i conti in RMB con un importo.</div>
+  <div class="mute" style="margin:4px 0 6px">Per ogni conto in RMB: importo e cambio del mese. Il valore in € si calcola da solo e i mesi passati non cambiano.</div>
   ${A('cash').map(row).join('')}<div class="row" style="margin-top:6px"><span class="mute">di cui “Liquidità” (conti selezionati)</span><span id="nws-liqc"></span></div></div>
   <div class="card">${head('Debiti','nws-debts','debts')}${A('debts').map(row).join('')}</div>
-  <div class="card">${head('TFR (netto, entra nel Net Worth)','nws-tfr','')}<div class="mute" style="margin-bottom:6px">Valore proposto = TFR precedente + TFR delle buste paga inserite.</div>
-  ${D.tfr.map(it=>`${row(it)}<div class="row nwr"><span class="mute">Tasse ipotetiche %</span><span class="nwi"><input id="nw-r-${it.id}" type="number" inputmode="decimal" step="0.1" value="${st.rates&&st.rates[it.id]!=null?st.rates[it.id]:26}" oninput="nwLive()"></span></div><div class="row"><span>${esc(it.name)}_Netto</span><b id="nwn-${it.id}"></b></div>`).join('')}
-  <button class="ghost" style="margin-top:6px" onclick="nwRefresh()">↻ Ricalcola da buste paga</button></div>
+  <div class="card">${head('TFR (netto, entra nel Net Worth)','nws-tfr','')}<div class="mute" style="margin-bottom:6px">Il TFR si calcola da solo sommando quello delle buste paga inserite. Se hai TFR accumulato prima delle buste paga presenti nell’app, scrivilo nel “Saldo iniziale”.</div>
+  ${D.tfr.map(it=>`<div class="row nwr"><span>${esc(it.name)} <span class="mute">· da buste paga</span></span><b id="nwt-${it.id}"></b></div><div class="row nwr"><span class="mute">Saldo iniziale</span><span class="nwi"><input type="number" inputmode="decimal" step="0.01" value="${it.start||''}" onchange="nwTfrStart('${it.id}',this.value)"></span></div><div class="row nwr"><span class="mute">Tasse ipotetiche %</span><span class="nwi"><input id="nw-r-${it.id}" type="number" inputmode="decimal" step="0.1" value="${st.rates&&st.rates[it.id]!=null?st.rates[it.id]:26}" oninput="nwLive()"></span></div><div class="row"><span>${esc(it.name)}_Netto</span><b id="nwn-${it.id}"></b></div>`).join('')}</div>
   <div class="card">${head('Immobili','nws-prop','prop')}${A('prop').map(row).join('')}</div>
   <button style="width:100%" onclick="nwSave()">Salva mese</button>`;
 }
 function nwManage(){
-  const sec=nwsec,L=S.nwd[sec],T={stocks:'Stocks / ETF',cash:'Cash - Liquidity',debts:'Debiti',prop:'Immobili'},sl=(v,l,s)=>`<option value="${v}" ${s?'selected':''}>${l}</option>`;
+  const sec=nwsec,L=S.nwd[sec],T={stocks:'Stocks / ETF',cash:'Cash - Liquidity',debts:'Debiti',prop:'Immobili'},sl=(v,l,s)=>`<option value="${v}" ${s?'selected':''}>${l}</option>`,names=[...new Set(S.inv.map(a=>a.name))];
   return `<button class="ghost" onclick="nwv='data';render()">‹ Indietro</button><h1 style="margin-top:12px">Gestisci: ${T[sec]}</h1>
   <div class="mnav"><button class="ghost" onclick="nwShift(-1)">‹</button><b>${mName(nwm)}</b><button class="ghost" onclick="nwShift(1)">›</button></div>
-  <div class="mute" style="margin-bottom:10px">Mese di riferimento. Le voci nuove partono da questo mese. “Chiudi” nasconde la voce da questo mese in poi e conserva lo storico.</div>
-  ${L.map((it,i)=>{const on=act(it,nwm);return `<div class="card" style="${on?'':'opacity:.65'}"><input value="${esc(it.name)}" onchange="nwEdit('${sec}',${i},'name',this.value)">
-  <div class="mute" style="margin-bottom:8px">${on?'✔ Attiva in questo mese':it.from&&nwm<it.from?'Non ancora attiva (parte da '+mName(it.from)+')':'Chiusa (ultimo mese: '+mName(it.until)+')'}</div>
+  <div class="mute" style="margin-bottom:10px">Con le frecce ↑ ↓ cambi l’ordine delle voci. Mese di riferimento: le voci nuove partono da questo mese; “Chiudi” le nasconde da questo mese in poi e conserva lo storico.</div>
+  ${L.map((it,i)=>{const on=act(it,nwm);return `<div class="card" style="${on?'':'opacity:.65'}"><div class="row" style="gap:8px"><input value="${esc(it.name)}" style="margin:0" onchange="nwEdit('${sec}',${i},'name',this.value)"><button class="ghost" style="padding:8px 12px" onclick="nwMove('${sec}',${i},-1)" ${i===0?'disabled':''}>↑</button><button class="ghost" style="padding:8px 12px" onclick="nwMove('${sec}',${i},1)" ${i===L.length-1?'disabled':''}>↓</button></div>
+  <div class="mute" style="margin:8px 0">${on?'✔ Attiva in questo mese':it.from&&nwm<it.from?'Non ancora attiva (parte da '+mName(it.from)+')':'Chiusa (ultimo mese: '+mName(it.until)+')'}</div>
   ${sec==='cash'?`<label>Valuta</label><select onchange="nwEdit('cash',${i},'cur',this.value)">${sl('EUR','Euro (€)',it.cur!=='CNY')}${sl('CNY','RMB (¥)',it.cur==='CNY')}</select>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-bottom:10px"><input type="checkbox" style="width:auto;margin:0" ${it.liq?'checked':''} onchange="nwEdit('cash',${i},'liq',this.checked?1:0)"> Conta nella “Liquidità” del grafico</label>`:''}
-  ${sec==='stocks'&&it.auto!=='liq'?`<label>Titolo collegato agli Investimenti</label><select onchange="nwEdit('stocks',${i},'link',this.value)">${sl('','Automatico (stesso nome)',!it.link)}${S.inv.map(a=>sl(a.id,esc(a.name),it.link===a.id)).join('')}</select>`:''}
+  ${sec==='stocks'&&it.auto!=='liq'?`<label>Titolo degli Investimenti (somma tutti i PAC con questo nome)</label><select onchange="nwEdit('stocks',${i},'link',this.value)">${sl('','Automatico (stesso nome della voce)',!it.link)}${names.map(n=>sl(esc(n),esc(n),it.link===n)).join('')}</select>`:''}
   ${it.auto==='liq'?'':`<div class="fgrid"><div><label>Attiva dal</label><input type="month" value="${it.from||''}" onchange="nwEdit('${sec}',${i},'from',this.value)"></div><div><label>Ultimo mese</label><input type="month" value="${it.until||''}" onchange="nwEdit('${sec}',${i},'until',this.value)"></div></div>
   <div class="row" style="gap:8px">${it.until?`<button class="ghost" style="flex:1" onclick="nwReopen('${sec}',${i})">Riapri</button>`:`<button class="ghost" style="flex:1" onclick="nwClose('${sec}',${i})">Chiudi da ${mName(nwm)}</button>`}<button class="ghost" style="flex:1;color:var(--out)" onclick="nwDel('${sec}',${i})">Elimina</button></div>`}</div>`}).join('')}
   <button style="width:100%" onclick="nwAdd('${sec}')">+ Aggiungi voce da ${mName(nwm)}</button>`;
@@ -699,7 +705,7 @@ function nwPts(){
   if(NS.rng!=='max')ms=ms.slice(-(+NS.rng));
   return ms.map(m=>{
     const o={d:m+'-01'},sv=S.nws[m],tx=real().filter(t=>t.date.startsWith(m)),inn=c=>tx.filter(t=>t.type==='in'&&t.cat===c).reduce(sum,0),end=m+'-31';
-    if(sv&&sv.saved){const T=nwTot(sv.v,sv.fx,sv.rates,m);Object.assign(o,{nw:T.nw,stocks:T.stocks,cash:T.cash,tfrn:T.tn,prop:T.prop,debts:T.debts,liqc:T.liqc});S.nwd.tfr.forEach(it=>o['t_'+it.id]=T.tfrn[it.id])}
+    if(sv&&sv.saved){const T=nwTot(sv,m);Object.assign(o,{nw:T.nw,stocks:T.stocks,cash:T.cash,tfrn:T.tn,prop:T.prop,debts:T.debts,liqc:T.liqc});S.nwd.tfr.forEach(it=>o['t_'+it.id]=T.tfrn[it.id])}
     o.sEH=inn('Salary EH');o.sZX=inn('Salary ZX');o.oth=inn('Other EH&ZX');o.auu=inn('AUU MY');
     o.pas=S.inv.flatMap(a=>a.ops.filter(x=>x.type==='div'&&x.date.startsWith(m))).reduce((s,x)=>s+x.amount,0)+inn('Passive Int');
     o.fam=o.sEH+o.sZX+o.oth+o.auu+o.pas;o.exp=tx.filter(t=>t.type==='out').reduce(sum,0);
@@ -711,7 +717,7 @@ function nsTog(k){const i=NS.ser.indexOf(k);if(i<0)NS.ser.push(k);else NS.ser.sp
 function nwDash(){
   const ks=Object.keys(S.nws).filter(k=>S.nws[k].saved).sort();
   if(!ks.length)return `<div class="card empty">Nessun mese salvato.<br>Apri “Dati del mese”, controlla i valori proposti e premi “Salva mese”.<br><br><button onclick="nwv='data';render()">Compila ${mName(nwm)}</button></div>`;
-  const get=k=>({k,T:nwTot(S.nws[k].v,S.nws[k].fx,S.nws[k].rates,k)}),L=get(ks[ks.length-1]),P=ks.length>1?get(ks[ks.length-2]):null,all=nwSer(),SR=all.filter(s=>NS.ser.includes(s.k));
+  const get=k=>({k,T:nwTot(S.nws[k],k)}),L=get(ks[ks.length-1]),P=ks.length>1?get(ks[ks.length-2]):null,all=nwSer(),SR=all.filter(s=>NS.ser.includes(s.k));
   const pts=nwPts().filter(q=>SR.some(s=>q[s.k]!=null)),chip=s=>`<button class="chip ${NS.ser.includes(s.k)?'on':''}" style="border-left:5px solid ${s.col}" onclick="nsTog('${s.k}')">${s.n}</button>`;
   return `<div class="card"><div class="mute">Net Worth · ${mName(L.k)}</div><div class="big">${eur(L.T.nw)}</div>${P?`<div class="${L.T.nw>=P.T.nw?'in':'out'}">${sg(L.T.nw-P.T.nw)} <span class="mute">rispetto a ${mName(P.k)}</span></div>`:''}
   <div class="mute" style="margin-top:6px">Stocks/ETF ${eur(L.T.stocks)} · Cash ${eur(L.T.cash)} · TFR netto ${eur(L.T.tn)} · Immobili ${eur(L.T.prop)} · Debiti ${eur(L.T.debts)}</div></div>
@@ -910,7 +916,7 @@ function pd(v){
   return null;
 }
 function impParse(wb){
-  const R={tx:[],inv:[],cash:[],prices:[],errs:[],unk:{},skip:0,pacsNew:[]},cm={};
+  const R={tx:[],inv:[],cash:[],prices:[],nw:[],errs:[],unk:{},map:{},skip:0,pacsNew:[]},cm={};
   [...GR.flatMap(g=>g[1]),...CI].forEach(c=>cm[nz(c)]=c);
   const ex=new Set(S.tx.map(t=>[t.date,t.type,t.cat,t.amount,t.note||''].join('|'))),
   exo=new Set(S.inv.flatMap(a=>a.ops.map(o=>[a.name.toLowerCase(),o.date,o.type,o.qty,o.price,o.gross].join('|')))),
@@ -919,17 +925,27 @@ function impParse(wb){
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:true}),n=nz(sn);if(!rows.length)return;
     const km={};Object.keys(rows[0]).forEach(k=>km[nz(k)]=k);
     const g=(r,...ns)=>{for(const x of ns)if(km[x]!==undefined&&r[km[x]]!==''&&r[km[x]]!=null)return r[km[x]];return ''};
-    const kind=/istruz|liste|note/.test(n)?null:/liquid/.test(n)?'cash':/prezz/.test(n)?'price':(/invest/.test(n)||(km.titolo!==undefined&&km.operazione!==undefined))?'inv':(km.data!==undefined&&(km.importo!==undefined||km.netto!==undefined))?'tx':null;
+    const kind=/istruz|liste|note|categorie/.test(n)?null:/liquid/.test(n)?'cash':/prezz/.test(n)?'price':/^networth$/.test(n)?'nw':(/invest/.test(n)||(km.titolo!==undefined&&km.operazione!==undefined))?'inv':(km.data!==undefined&&(km.importo!==undefined||km.netto!==undefined))?'tx':null;
     if(!kind)return;
     rows.forEach((r,i)=>{
       if(Object.values(r).every(v=>v===''))return;
-      const at=sn+' riga '+(i+2),date=pd(g(r,'data'));
+      const at=sn+' riga '+(i+2);
+      if(kind==='nw'){
+        const raw=g(r,'mese','data'),s0=String(raw).trim(),mm=/^\d{4}-\d{2}$/.test(s0)?s0:(pd(raw)||'').slice(0,7),nm=String(g(r,'voce','nome')).trim(),amt=pn(g(r,'importo')),fx=pn(g(r,'cambio')),sc=nz(g(r,'sezione'));
+        if(!mm||!nm||!(amt===amt)){R.errs.push(at+': mese, voce o importo non validi');return}
+        const sec=/cash|liquid/.test(sc)?'cash':/deb/.test(sc)?'debts':/immob|prop/.test(sc)?'prop':null,ex2=['cash','debts','prop'].map(k=>S.nwd[k].find(x=>x.name.trim().toLowerCase()===nm.toLowerCase()&&(!sec||k===sec))&&k).find(Boolean),fs=sec||ex2;
+        if(!fs){R.errs.push(at+': sezione mancante per la voce “'+nm+'” (Cash, Debiti o Immobili)');return}
+        const it=S.nwd[fs].find(x=>x.name.trim().toLowerCase()===nm.toLowerCase());
+        if(it&&S.nws[mm]&&S.nws[mm].v&&S.nws[mm].v[it.id]!=null){R.skip++;return}
+        R.nw.push({m:mm,sec:fs,name:nm,amt,fx:fx===fx&&fx>0?fx:null});return;
+      }
+      const date=pd(g(r,'data'));
       if(!date){R.errs.push(at+': data non valida');return}
       if(kind==='tx'){
         let amt=pn(g(r,'importo','netto','importoeuro'));if(!(Math.abs(amt)>0)){R.errs.push(at+': importo mancante o non valido');return}amt=Math.abs(amt);
-        const raw=String(g(r,'categoria','sottocategoria')).trim(),cat=cm[nz(raw)]||raw,tp=nz(g(r,'tipo'));
+        const raw=String(g(r,'categoria','sottocategoria')).trim(),cat=cm[nz(raw)]||(S.catmap&&S.catmap[raw])||raw,tp=nz(g(r,'tipo'));
         if(!cat){R.errs.push(at+': categoria mancante');return}
-        if(!cm[nz(raw)])R.unk[raw]=(R.unk[raw]||0)+1;
+        if(!cm[nz(raw)]&&!(S.catmap&&S.catmap[raw])){R.unk[raw]=(R.unk[raw]||0)+1;if(!(raw in R.map)){const f=VC.find(([c,rg])=>rg.test(raw.toLowerCase()));R.map[raw]=f?f[0]:''}}
         const type=['entrata','entrate','in','incasso'].includes(tp)?'in':['spesa','spese','uscita','out','costo'].includes(tp)?'out':(CI.includes(cat)?'in':'out'),note=String(g(r,'nota','descrizione','note')).trim();
         if(ex.has([date,type,cat,amt,note].join('|'))){R.skip++;return}
         const t={id:uid(),type,amount:amt,cat,date,note,bp:false,bpv:0,bpr:0,pay:false,company:'',ral:0,gross:0,bpm:0,otH:0,otE:0,ded:0,tfr:0,pct:0},bu=pn(g(r,'buonipastousati','buonipastoutilizzati'));
@@ -957,11 +973,13 @@ function impParse(wb){
       }else{
         const nm=String(g(r,'titolo','nome')).trim(),pr=pn(g(r,'prezzo'));
         if(!nm||!(pr>0)){R.errs.push(at+': titolo o prezzo non validi');return}
+        if(S.inv.some(a=>a.name.trim().toLowerCase()===nm.toLowerCase()&&(a.prices||[]).some(p=>p.date===date&&p.price===pr))){R.skip++;return}
         R.prices.push({name:nm,date,price:pr,i:at});
       }
     });
   });
   R.prices=R.prices.filter(p=>{if(names.has(p.name.toLowerCase()))return true;R.errs.push(p.i+': titolo “'+p.name+'” non trovato (inseriscilo prima nel foglio Investimenti)');return false});
+  R.unkL=Object.entries(R.unk).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
   return R;
 }
 async function impFile(file){
@@ -976,34 +994,62 @@ async function impFile(file){
 }
 function impGo(){
   const I=IMP;if(!I)return;
-  I.tx.forEach(t=>S.tx.push(t));I.pacsNew.forEach(p=>{if(!S.pacs.includes(p))S.pacs.push(p)});
+  I.tx.forEach(t=>{const mc=I.map[t.cat];if(mc){(S.catmap=S.catmap||{})[t.cat]=mc;t.cat=mc}S.tx.push(t)});I.pacsNew.forEach(p=>{if(!S.pacs.includes(p))S.pacs.push(p)});
   const A=n=>S.inv.find(a=>a.name.trim().toLowerCase()===n.trim().toLowerCase());
   I.inv.forEach(o=>{let a=A(o.name);if(!a){a={id:uid(),name:o.name,kind:o.kind,pac:o.pac,ops:[],prices:[]};S.inv.push(a)}a.ops.push(o.op)});
   I.prices.forEach(p=>{const a=A(p.name);if(a){a.prices=(a.prices||[]).filter(x=>x.date!==p.date);a.prices.push({date:p.date,price:p.price})}});
   I.cash.forEach(c=>S.cash.push(c));
-  save();impMsg=`Importati: ${I.tx.length} movimenti, ${I.inv.length} operazioni di investimento, ${I.cash.length} movimenti di liquidità, ${I.prices.length} prezzi ✔`;IMP=null;render();
+  const first={};I.nw.forEach(x=>{const k=x.sec+'|'+x.name.toLowerCase();if(!first[k]||x.m<first[k])first[k]=x.m});
+  I.nw.forEach(x=>{
+    let it=S.nwd[x.sec].find(y=>y.name.trim().toLowerCase()===x.name.toLowerCase());
+    if(!it){it={id:uid(),name:x.name,cur:x.fx?'CNY':'EUR',from:first[x.sec+'|'+x.name.toLowerCase()]};S.nwd[x.sec].push(it)}
+    else if(x.fx&&it.cur!=='CNY')it.cur='CNY';
+    const sn=S.nws[x.m]||(S.nws[x.m]={v:{},fxi:{},rates:{tfrEH:26,tfrZX:26},saved:true});
+    sn.v=sn.v||{};sn.fxi=sn.fxi||{};sn.v[it.id]=x.amt;if(x.fx)sn.fxi[it.id]=x.fx;sn.saved=true;
+  });
+  save();impMsg=`Importati: ${I.tx.length} movimenti, ${I.inv.length} operazioni di investimento, ${I.cash.length} movimenti di liquidità, ${I.prices.length} prezzi, ${I.nw.length} valori di Net Worth ✔`;IMP=null;render();
 }
 function impCard(){
-  const I=IMP,unk=I?Object.entries(I.unk).sort((a,b)=>b[1]-a[1]):[];
+  const I=IMP,tot=I?I.tx.length+I.inv.length+I.cash.length+I.prices.length+I.nw.length:0,opts=sel=>`<option value="">Mantieni così</option>${GR.map(([n,l])=>`<optgroup label="${n}">${l.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`).join('')}<optgroup label="Entrate">${CI.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`;
   return `<div class="card"><h2 style="margin-top:0">📥 Importa / 📤 Esporta Excel</h2>
-  <p class="mute">Compila il modello Excel (anche con migliaia di righe) e importalo qui: Movimenti, Investimenti, Liquidità, Prezzi. Le righe già presenti vengono saltate.</p>
-  <div class="row" style="gap:8px;justify-content:flex-start"><label class="chip" style="cursor:pointer">📂 Scegli file Excel/CSV<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="impFile(this.files[0])"></label><button class="ghost" onclick="expXlsx()">📤 Esporta in Excel</button></div>
+  <p class="mute">Importa dal modello Excel (Movimenti, Investimenti, Liquidità, Prezzi, NetWorth) anche con migliaia di righe: le righe già presenti vengono saltate. “Esporta” crea un file con tutti i tuoi dati, utile come archivio e riutilizzabile per importare.</p>
+  <div class="row" style="gap:8px;justify-content:flex-start"><label class="chip" style="cursor:pointer">📂 Scegli file Excel/CSV<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="impFile(this.files[0])"></label><button class="ghost" onclick="expXlsx()">📤 Esporta tutto in Excel</button></div>
   ${impMsg?`<div style="margin-top:8px">${esc(impMsg)}</div>`:''}
-  ${I?`<div style="margin-top:10px"><b>Anteprima</b><div class="mute">Movimenti: <b>${I.tx.length}</b> nuovi · Investimenti: <b>${I.inv.length}</b> · Liquidità: <b>${I.cash.length}</b> · Prezzi: <b>${I.prices.length}</b>${I.skip?` · già presenti (saltati): ${I.skip}`:''}</div>
-  ${unk.length?`<div style="margin-top:6px">⚠ Categorie non riconosciute (verranno importate così come sono, nel gruppo “Altro”): ${unk.slice(0,12).map(([k,v])=>esc(k)+' ('+v+')').join(', ')}${unk.length>12?'…':''}</div>`:''}
+  ${I?`<div style="margin-top:10px"><b>Anteprima</b><div class="mute">Movimenti: <b>${I.tx.length}</b> · Investimenti: <b>${I.inv.length}</b> · Liquidità: <b>${I.cash.length}</b> · Prezzi: <b>${I.prices.length}</b> · Net Worth: <b>${I.nw.length}</b>${I.skip?` · già presenti (saltati): ${I.skip}`:''}</div>
+  ${I.unkL.length?`<div style="margin-top:8px"><b>Categorie non riconosciute</b><div class="mute">Scegli a quale categoria assegnarle (ho preselezionato un suggerimento dove possibile).</div>${I.unkL.slice(0,40).map((k,i)=>`<div class="row" style="gap:8px;margin:6px 0"><span>${esc(k)} <span class="mute">(${I.unk[k]})</span></span><select style="width:55%;margin:0" onchange="IMP.map[IMP.unkL[${i}]]=this.value">${opts(I.map[k])}</select></div>`).join('')}${I.unkL.length>40?'<div class="mute">…altre non mostrate: restano come scritte.</div>':''}</div>`:''}
   ${I.errs.length?`<div class="out" style="margin-top:6px">${I.errs.length} righe non importabili:<br>${I.errs.slice(0,8).map(esc).join('<br>')}${I.errs.length>8?'<br>…':''}</div>`:''}
-  <div class="row" style="gap:8px;margin-top:10px"><button style="flex:1" onclick="impGo()" ${I.tx.length+I.inv.length+I.cash.length+I.prices.length?'':'disabled'}>Importa</button><button class="ghost" style="flex:1" onclick="IMP=null;render()">Annulla</button></div></div>`:''}</div>`;
+  <div class="row" style="gap:8px;margin-top:10px"><button style="flex:1" onclick="impGo()" ${tot?'':'disabled'}>Importa</button><button class="ghost" style="flex:1" onclick="IMP=null;render()">Annulla</button></div></div>`:''}</div>`;
 }
 async function expXlsx(){
   try{
-    await xlsLoad();const wb=XLSX.utils.book_new(),A=(n,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),n);
+    await xlsLoad();const wb=XLSX.utils.book_new(),A=(n,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),n),D=S.nwd;
     A('Movimenti',[...S.tx].filter(t=>t.type!=='pay').sort((a,b)=>a.date.localeCompare(b.date)).map(t=>({'Data':t.date,'Tipo':t.type==='in'?'Entrata':'Spesa','Categoria':t.cat,'Importo':t.amount,'Nota':t.note||'','Buoni pasto usati':t.bp?t.bpv:'','Company':t.company||'','RAL':t.pay?t.ral:'','Lordo':t.pay?t.gross:'','Buoni pasto in busta':t.pay?t.bpm:'','h straordinario':t.pay?t.otH:'','€ straordinario':t.pay?t.otE:'','Totale trattenute':t.pay?t.ded:'','TFR':t.pay?t.tfr:''})));
     A('Investimenti',S.inv.flatMap(a=>a.ops.map(o=>({'Data':o.date,'Titolo':a.name,'Tipo titolo':a.kind,'PAC':a.pac,'Operazione':o.type==='buy'?'Acquisto':o.type==='sell'?'Vendita':'Cedola','Quantità':o.qty!=null?o.qty:'','Prezzo':o.price!=null?o.price:'','Commissioni':o.fee||'','Cedola lorda':o.type==='div'?(o.gross!=null?o.gross:o.amount):'','Tasse cedola':o.type==='div'?(o.tax||0):'','Movimenta liquidità':o.cash===false?'No':'Sì'}))).sort((a,b)=>a.Data.localeCompare(b.Data)));
     A('Liquidità',S.cash.map(c=>({'Data':c.date,'PAC':c.pac,'Tipo':c.type==='dep'?'Bonifico':c.type==='wd'?'Prelievo':'FEE','Tipo FEE':c.sub||'','Importo':c.amount,'Nota':c.note||''})));
     A('Prezzi',S.inv.flatMap(a=>(a.prices||[]).map(p=>({'Data':p.date,'Titolo':a.name,'Prezzo':p.price}))));
+    const ks=Object.keys(S.nws).filter(k=>S.nws[k].saved).sort(),SEC=[['cash','Cash'],['debts','Debiti'],['prop','Immobili']],nwr=[],rie=[];
+    ks.forEach(k=>{const sn=S.nws[k],fi=fxiOf(sn);SEC.forEach(([s,lab])=>D[s].filter(it=>act(it,k)&&sn.v&&sn.v[it.id]!=null).forEach(it=>{const f=it.cur==='CNY'?(fi[it.id]!=null?+fi[it.id]:''):'';nwr.push({'Mese':k,'Sezione':lab,'Voce':it.name,'Valuta':it.cur==='CNY'?'RMB':'EUR','Importo':sn.v[it.id],'Cambio':f,'Importo €':it.cur==='CNY'?Math.round(sn.v[it.id]*(+f||0)*100)/100:sn.v[it.id]})}));
+      const T=nwTot(sn,k);rie.push({'Mese':k,'Stocks / ETF':Math.round(T.stocks*100)/100,'Cash':Math.round(T.cash*100)/100,'TFR lordo':Math.round(Object.values(T.tfr).reduce((a,b)=>a+b,0)*100)/100,'TFR netto':Math.round(T.tn*100)/100,'Immobili':T.prop,'Debiti':T.debts,'Net Worth':Math.round(T.nw*100)/100})});
+    A('NetWorth',nwr);A('NW riepilogo',rie);
+    A('Voci NW',[['stocks','Stocks / ETF'],['cash','Cash'],['debts','Debiti'],['prop','Immobili'],['tfr','TFR']].flatMap(([s,lab])=>D[s].map((it,i)=>({'Sezione':lab,'Ordine':i+1,'Voce':it.name,'Valuta':it.cur==='CNY'?'RMB':'EUR','Attiva dal':it.from||'','Ultimo mese':it.until||'','Conta in Liquidità':it.liq?'Sì':'','Titolo collegato':it.link||'','Saldo iniziale TFR':it.start||''}))));
+    A('Impostazioni',[...S.pacs.map((p,i)=>({'Impostazione':'PAC '+(i+1),'Valore':p})),{'Impostazione':'Rata Agos (€)','Valore':S.agos.amt},{'Impostazione':'Rata Agos fino a','Valore':S.agos.until}]);
     XLSX.writeFile(wb,'fin-fam-dati-'+today()+'.xlsx');
   }catch(e){impMsg='Errore: '+e.message;render()}
 }
+function assetsFor(it){
+  const key=it.link?((S.inv.find(a=>a.id===it.link)||{name:it.link}).name):it.name,k=String(key).trim().toLowerCase();
+  return S.inv.filter(a=>a.name.trim().toLowerCase()===k);
+}
+function stockAuto(it,m){
+  const end=m+'-31';
+  if(it.auto==='liq')return S.pacs.reduce((s,p)=>s+cashAt(p,end),0);
+  const as=assetsFor(it);return as.length?as.reduce((s,a)=>s+valAt(a,end),0):null;
+}
+function tfrAt(it,m){return (+it.start||0)+real().filter(t=>t.pay&&t.cat===it.cat&&t.date.slice(0,7)<=m).reduce((s,t)=>s+(t.tfr||0),0)}
+function fxiOf(sn,list){const o={};(list||S.nwd.cash).forEach(it=>{if(it.cur==='CNY'){const x=sn.fxi&&sn.fxi[it.id]!=null?sn.fxi[it.id]:sn.fx;if(x!=null&&x!=='')o[it.id]=x}});return o}
+function nwApplyFx(){const x=$('#nw-fxall').value;if(String(x)==='')return;S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm)).forEach(c=>{const e=$('#nw-fx-'+c.id);if(e)e.value=x});nwLive()}
+function nwTfrStart(id,v){S.nwd.tfr.find(i=>i.id===id).start=parseFloat(v)||0;save();nwLive()}
+function nwMove(sec,i,d){const L=S.nwd[sec],j=i+d;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
 const TABS=[['home','Riepilogo','🏠'],['add','Aggiungi','➕'],['list','Movimenti','📋'],['inv','Investimenti','📈'],['nw','Net Worth','💎'],['settings','Impost.','⚙️']];
 const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
