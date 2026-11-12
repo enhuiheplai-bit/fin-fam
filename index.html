@@ -51,11 +51,13 @@ table{border-collapse:collapse;width:100%;font-size:.8rem}th,td{padding:5px 6px;
 .leg{flex-wrap:wrap}.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.fgrid select{margin:0}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.chip{padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:.82rem}.chip.on{background:var(--main);color:#fff;border-color:var(--main)}
 nav button{padding:7px 2px 8px;font-size:.64rem;line-height:1.25}nav button span{display:block;font-size:1.15rem}body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}.nwi input{width:130px;margin:2px 0;text-align:right}.nwr{padding:2px 0}.nwi{white-space:nowrap}
+#pvbtn{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:60;width:40px;height:40px;border-radius:50%;padding:0;font-size:1.15rem;line-height:40px;background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.18)}.pv{filter:blur(7px);user-select:none;-webkit-user-select:none}body.priv input[type=number]{filter:blur(6px)}
 </style>
 </head>
 <body>
 <main id="app"></main>
 <nav id="nav"></nav>
+<button id="pvbtn" onclick="pvToggle()" aria-label="Nascondi gli importi" aria-pressed="false" title="Nascondi/mostra gli importi">👁️</button>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -338,7 +340,7 @@ function delAsset(id){if(confirm('Eliminare il titolo e tutte le sue operazioni?
 /* ---------- impostazioni ---------- */
 function settings(){
   const A=S.agos;
-  return `<h1>Impostazioni</h1>${drCard()}${impCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
+  return `<h1>Impostazioni</h1>${privCard()}${drCard()}${impCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
   <div class="card"><h2 style="margin-top:0">Scenario rata Agos</h2><label>Importo mensile (€)</label><input type="number" inputmode="decimal" value="${A.amt}" onchange="S.agos.amt=Math.max(0,parseFloat(this.value)||0);save();render()">
   <label>Ultimo mese in cui compare</label><input type="month" value="${A.until}" onchange="if(this.value){S.agos.until=this.value;save();render()}"></div>
   <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>
@@ -370,7 +372,7 @@ function resHtml(){
   ${l.length?`<h2>Andamento nel tempo</h2><div class="card">${trend(l)}</div>`:''}${payCard(l)}
   <div class="card">${l.length?l.slice(0,300).map(txRow).join('')+(l.length>300?'<div class="mute">Mostrate le prime 300: restringi la ricerca.</div>':''):'<div class="empty">Nessun risultato.</div>'}</div>`;
 }
-function fq(v){F.q=v;$('#res').innerHTML=resHtml()}
+function fq(v){F.q=v;$('#res').innerHTML=resHtml();pvApply($('#res'))}
 function setF(k,v){F[k]=v;if(k==='g')F.c='';render()}
 function clrF(){F={q:'',y:'',m:'',d:'',g:'',c:'',t:''};render()}
 function ledger(p){
@@ -564,6 +566,7 @@ function chPick(e,id){
   d.xs.forEach((x,i)=>{if(Math.abs(x-vx)<Math.abs(d.xs[bi]-vx))bi=i});
   const q=d.p[bi],v=$('#chv-'+id);if(v){v.setAttribute('x1',d.xs[bi]);v.setAttribute('x2',d.xs[bi])}
   $('#chinfo-'+id).innerHTML=`<b style="color:var(--ink)">${d.fmt(q.d)}</b><br>`+d.SR.filter(s=>q[s.k]!=null).map(s=>`<span style="color:${s.col}">●</span> ${s.n}: <b style="color:var(--ink)">${eur(q[s.k])}</b>`).join('<br>');
+  pvApply($('#chinfo-'+id));
 }
 function chDates(){
   let ds=[...new Set([...S.inv.flatMap(a=>[...a.ops.map(o=>o.date),...(a.prices||[]).map(p=>p.date)]),...S.pacs.flatMap(p=>ledger(p).map(x=>x.date))])].sort();
@@ -653,6 +656,7 @@ function nwLive(){
   const cn=S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm));
   cn.forEach(c=>set('nwe-'+c.id,'≈ '+eur((sn.v[c.id]||0)*(+sn.fxi[c.id]||0))));
   const w=$('#nw-warn');if(w)w.hidden=!cn.some(c=>sn.v[c.id]&&!(+sn.fxi[c.id]>0));
+  pvApply();
 }
 function nwSave(){S.nws[nwm]={...nwRead(),saved:true};save();render()}
 function nwRefresh(){Object.entries(nwAuto(nwm)).forEach(([id,x])=>{const e=$('#nw-'+id);if(e)e.value=x});nwLive()}
@@ -832,7 +836,7 @@ function drDisconnect(){
   try{if(drTok&&window.google)google.accounts.oauth2.revoke(drTok)}catch(e){}
   drTok=null;DR={cid:DR.cid};drSave();drMsg='';render();
 }
-function drBar(){return `<div class="card" style="padding:8px 12px;border-color:var(--alt);cursor:pointer" onclick="drSync()">${DR.needsAuth?'☁ Sessione Google scaduta · tocca per risincronizzare':'☁ Modifiche non ancora su Drive · tocca per sincronizzare'}</div>`}
+function drBar(){return `<div class="card" style="padding:8px 12px;margin-right:52px;border-color:var(--alt);cursor:pointer" onclick="drSync()">${DR.needsAuth?'☁ Sessione Google scaduta · tocca per risincronizzare':'☁ Modifiche non ancora su Drive · tocca per sincronizzare'}</div>`}
 function drCard(){
   const cid=drCid(),T=DR.lastSync?new Date(DR.lastSync).toLocaleString('it-IT'):'mai';
   return `<div class="card"><h2 style="margin-top:0">☁ Google Drive</h2>
@@ -1050,6 +1054,40 @@ function fxiOf(sn,list){const o={};(list||S.nwd.cash).forEach(it=>{if(it.cur==='
 function nwApplyFx(){const x=$('#nw-fxall').value;if(String(x)==='')return;S.nwd.cash.filter(c=>c.cur==='CNY'&&act(c,nwm)).forEach(c=>{const e=$('#nw-fx-'+c.id);if(e)e.value=x});nwLive()}
 function nwTfrStart(id,v){S.nwd.tfr.find(i=>i.id===id).start=parseFloat(v)||0;save();nwLive()}
 function nwMove(sec,i,d){const L=S.nwd[sec],j=i+d;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];save();render()}
+let PV={on:false,style:'blur',auto:false};try{Object.assign(PV,JSON.parse(localStorage.getItem('finfam-priv')||'{}'))}catch(e){}
+if(PV.auto)PV.on=true;
+const PVO=new WeakMap(),PVRE=/[+−\-]?\s*\d[\d.]*(?:,\d+)?\s*(?:€|%)|€\s*\d[\d.,]*|\d[\d.]*(?:,\d+)?(?=\s+quote)/g;
+function pvSave(){try{localStorage.setItem('finfam-priv',JSON.stringify(PV))}catch(e){}}
+function pvClear(){
+  const r=document.getElementById&&document.getElementById('app');if(!r||!document.createTreeWalker)return;
+  r.querySelectorAll('.pv').forEach(s=>s.replaceWith(document.createTextNode(s.textContent)));
+  const w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT),ns=[];let n;while(n=w.nextNode())ns.push(n);
+  ns.forEach(t=>{if(PVO.has(t)){t.nodeValue=PVO.get(t);PVO.delete(t)}});
+}
+function pvApply(root){
+  if(!document.getElementById||!document.createTreeWalker)return;
+  if(document.body)document.body.classList.toggle('priv',!!PV.on);
+  const b=document.getElementById('pvbtn');if(b){b.textContent=PV.on?'🙈':'👁️';b.setAttribute('aria-pressed',PV.on?'true':'false');b.setAttribute('aria-label',PV.on?'Mostra gli importi':'Nascondi gli importi')}
+  if(!PV.on)return;
+  root=root||document.getElementById('app');if(!root)return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[];let n;while(n=w.nextNode())ns.push(n);
+  ns.forEach(t=>{
+    const p=t.parentNode;if(!p)return;
+    if(/^(script|style|option|textarea)$/i.test(p.nodeName||'')||(p.classList&&p.classList.contains('pv')))return;
+    const s=t.nodeValue;PVRE.lastIndex=0;if(!PVRE.test(s))return;
+    if(p.namespaceURI==='http://www.w3.org/2000/svg'||PV.style==='ast'){PVO.set(t,s);PVRE.lastIndex=0;t.nodeValue=s.replace(PVRE,'••••');return}
+    const fr=document.createDocumentFragment();let last=0,m;PVRE.lastIndex=0;
+    while((m=PVRE.exec(s))){fr.appendChild(document.createTextNode(s.slice(last,m.index)));const sp=document.createElement('span');sp.className='pv';sp.textContent=m[0];fr.appendChild(sp);last=m.index+m[0].length}
+    fr.appendChild(document.createTextNode(s.slice(last)));p.replaceChild(fr,t);
+  });
+}
+function pvToggle(){PV.on=!PV.on;pvSave();if(!PV.on)pvClear();pvApply()}
+function pvSet(k,v){PV[k]=v;pvSave();render()}
+function privCard(){
+  return `<div class="card"><h2 style="margin-top:0">🙈 Privacy schermo</h2><p class="mute">Il pulsante 👁️ in alto a destra nasconde importi e percentuali (utile quando usi l’app in pubblico). Un altro tocco li mostra di nuovo.</p>
+  <div class="seg"><button class="${PV.style==='blur'?'on':''}" onclick="pvSet('style','blur')">Sfocato</button><button class="${PV.style==='ast'?'on':''}" onclick="pvSet('style','ast')">Asterischi ••••</button></div>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" style="width:auto;margin:0" ${PV.auto?'checked':''} onchange="pvSet('auto',this.checked)"> Parti sempre con gli importi nascosti</label></div>`;
+}
 const TABS=[['home','Riepilogo','🏠'],['add','Aggiungi','➕'],['list','Movimenti','📋'],['inv','Investimenti','📈'],['nw','Net Worth','💎'],['settings','Impost.','⚙️']];
 const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
@@ -1059,6 +1097,7 @@ function render(){
   if(tab==='inv'&&iv.v==='form')invTog();
   if(tab==='inv'&&iv.v==='cform')cfTog();
   if(tab==='nw'&&nwv==='data')nwLive();
+  pvApply();
 }
 normS();render();drStart();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
