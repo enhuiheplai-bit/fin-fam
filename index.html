@@ -218,9 +218,9 @@ function del(id){if(confirm('Eliminare questo movimento?')){S.tx=S.tx.filter(t=>
 /* ---------- investimenti ---------- */
 const fac=a=>a.kind==='BTP'?0.01:1;
 function series(a){
-  const m={};
-  a.ops.filter(o=>o.type!=='div').forEach(o=>m[o.date]={price:o.price,src:o.type==='buy'?'acquisto':'vendita'});
-  (a.prices||[]).forEach(p=>m[p.date]={price:p.price,src:'m'});
+  const m={},k=nname(a.name),G=S.inv.filter(x=>nname(x.name)===k);if(!G.includes(a))G.push(a);
+  G.forEach(x=>x.ops.filter(o=>o.type!=='div').forEach(o=>{const c=m[o.date];if(!c||c.src!=='m')m[o.date]={price:o.price,src:o.type==='buy'?'acquisto':'vendita'}}));
+  G.forEach(x=>(x.prices||[]).forEach(p=>m[p.date]={price:p.price,src:'m'}));
   return Object.entries(m).sort((x,y)=>x[0].localeCompare(y[0])).map(([date,v])=>({date,...v}));
 }
 function pos(a,d='9999-12-31'){
@@ -340,13 +340,13 @@ function delAsset(id){if(confirm('Eliminare il titolo e tutte le sue operazioni?
 /* ---------- impostazioni ---------- */
 function settings(){
   const A=S.agos;
-  return `<h1>Impostazioni</h1>${privCard()}${drCard()}${impCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<input value="${esc(p)}" onchange="renPac(${i},this.value)">`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
+  return `<h1>Impostazioni</h1>${privCard()}${drCard()}${impCard()}<div class="card"><h2 style="margin-top:0">PAC</h2>${S.pacs.map((p,i)=>`<div class="row" style="gap:8px"><input value="${esc(p)}" onchange="renPac(${i},this.value)">${pacUsed(p)?'':`<button class="ghost" style="margin-bottom:12px" onclick="delPac(${i})" aria-label="Elimina PAC">✕</button>`}</div>`).join('')}<button class="ghost" onclick="addPac()">+ Aggiungi PAC</button></div>
   <div class="card"><h2 style="margin-top:0">Scenario rata Agos</h2><label>Importo mensile (€)</label><input type="number" inputmode="decimal" value="${A.amt}" onchange="S.agos.amt=Math.max(0,parseFloat(this.value)||0);save();render()">
   <label>Ultimo mese in cui compare</label><input type="month" value="${A.until}" onchange="if(this.value){S.agos.until=this.value;save();render()}"></div>
   <div class="card"><h2 style="margin-top:0">Copia di sicurezza</h2><p class="mute">I dati sono salvati su questo dispositivo. Scarica una copia per non perderli.</p><button onclick="backup()">Scarica copia dei dati</button></div>
   <p class="mute" style="text-align:center"><a href="privacy.html" style="color:var(--main)">Informativa sulla privacy</a></p>`;
 }
-function renPac(i,v){v=v.trim();const o=S.pacs[i];if(!v||S.pacs.includes(v))return render();S.pacs[i]=v;S.inv.forEach(a=>{if(a.pac===o)a.pac=v});S.cash.forEach(c=>{if(c.pac===o)c.pac=v});save();render()}
+function renPac(i,v){v=v.trim();const o=S.pacs[i];if(!v)return render();if(S.pacs.includes(v)&&v!==o){alert('Esiste già un PAC con questo nome.');return render()}S.pacs[i]=v;S.inv.forEach(a=>{if(a.pac===o)a.pac=v});S.cash.forEach(c=>{if(c.pac===o)c.pac=v});save();render()}
 function addPac(){let n=S.pacs.length+1;while(S.pacs.includes('PAC'+n))n++;S.pacs.push('PAC'+n);save();render()}
 function backup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='fin-fam-dati-'+today()+'.json';a.click()}
 
@@ -920,11 +920,11 @@ function pd(v){
   return null;
 }
 function impParse(wb){
-  const R={tx:[],inv:[],cash:[],prices:[],nw:[],errs:[],unk:{},map:{},skip:0,pacsNew:[]},cm={};
+  const R={tx:[],inv:[],cash:[],prices:[],nw:[],errs:[],unk:{},map:{},skip:0,pacsNew:[],moves:[]},cm={};
   [...GR.flatMap(g=>g[1]),...CI].forEach(c=>cm[nz(c)]=c);
   const ex=new Set(S.tx.map(t=>[t.date,t.type,t.cat,t.amount,t.note||''].join('|'))),
-  exo=new Set(S.inv.flatMap(a=>a.ops.map(o=>[a.name.toLowerCase(),o.date,o.type,o.qty,o.price,o.gross].join('|')))),
-  names=new Set(S.inv.map(a=>a.name.trim().toLowerCase())),pacs=new Set(S.pacs);
+  exoMap=new Map(),names=new Set(S.inv.map(a=>nname(a.name))),pacs=new Set(S.pacs);
+  S.inv.forEach(a=>a.ops.forEach(o=>{const k=[nname(a.name),o.date,o.type,o.qty,o.price,o.gross].join('|');if(!exoMap.has(k))exoMap.set(k,[]);exoMap.get(k).push({a,o})}));
   wb.SheetNames.forEach(sn=>{
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:true}),n=nz(sn);if(!rows.length)return;
     const km={};Object.keys(rows[0]).forEach(k=>km[nz(k)]=k);
@@ -963,10 +963,12 @@ function impParse(wb){
         const pac=String(g(r,'pac')).trim()||S.pacs[0],o={id:uid(),date,type:ty,cash:!['no','n','0','false'].includes(nz(g(r,'movimentaliquidita')))};
         if(ty==='div'){const gr=pn(g(r,'cedolalorda','lordo','importo')),tx=pn(g(r,'tassecedola','tasse'))||0;if(!(gr>0)){R.errs.push(at+': cedola lorda mancante');return}o.gross=gr;o.tax=tx;o.amount=Math.round((gr-tx)*100)/100}
         else{o.qty=pn(g(r,'quantita','nominale'));o.price=pn(g(r,'prezzo'));o.fee=pn(g(r,'commissioni'))||0;if(!(o.qty>0&&o.price>0)){R.errs.push(at+': quantità o prezzo non validi');return}}
-        if(exo.has([nm.toLowerCase(),o.date,o.type,o.qty,o.price,o.gross].join('|'))){R.skip++;return}
         let k=String(g(r,'tipotitolo','tipo')).trim();k=['ETF','BTP','Azione','Altro'].find(x=>nz(x)===nz(k))||'ETF';
         if(!pacs.has(pac)){pacs.add(pac);R.pacsNew.push(pac)}
-        names.add(nm.toLowerCase());R.inv.push({name:nm,kind:k,pac,op:o});
+        const ek=[nname(nm),o.date,o.type,o.qty,o.price,o.gross].join('|'),lst=exoMap.get(ek)||[],ix=lst.findIndex(x=>x.a.pac===pac);
+        if(ix>=0){lst.splice(ix,1);R.skip++;return}
+        if(lst.length){const x=lst.shift();R.moves.push({op:x.o,from:x.a,name:nm,kind:k,pac});return}
+        names.add(nname(nm));R.inv.push({name:nm,kind:k,pac,op:o});
       }else if(kind==='cash'){
         const amt=pn(g(r,'importo')),tp=nz(g(r,'tipo')),pac=String(g(r,'pac')).trim()||S.pacs[0],ty=['bonifico','bonificoinentrata','versamento','deposito'].includes(tp)?'dep':tp==='prelievo'?'wd':tp==='fee'?'fee':null;
         if(!ty||!(amt>0)){R.errs.push(at+': tipo o importo non validi');return}
@@ -977,12 +979,12 @@ function impParse(wb){
       }else{
         const nm=String(g(r,'titolo','nome')).trim(),pr=pn(g(r,'prezzo'));
         if(!nm||!(pr>0)){R.errs.push(at+': titolo o prezzo non validi');return}
-        if(S.inv.some(a=>a.name.trim().toLowerCase()===nm.toLowerCase()&&(a.prices||[]).some(p=>p.date===date&&p.price===pr))){R.skip++;return}
+        if(S.inv.some(a=>nname(a.name)===nname(nm)&&(a.prices||[]).some(p=>p.date===date&&p.price===pr))){R.skip++;return}
         R.prices.push({name:nm,date,price:pr,i:at});
       }
     });
   });
-  R.prices=R.prices.filter(p=>{if(names.has(p.name.toLowerCase()))return true;R.errs.push(p.i+': titolo “'+p.name+'” non trovato (inseriscilo prima nel foglio Investimenti)');return false});
+  R.prices=R.prices.filter(p=>{if(names.has(nname(p.name)))return true;R.errs.push(p.i+': titolo “'+p.name+'” non trovato (inseriscilo prima nel foglio Investimenti)');return false});
   R.unkL=Object.entries(R.unk).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
   return R;
 }
@@ -999,9 +1001,10 @@ async function impFile(file){
 function impGo(){
   const I=IMP;if(!I)return;
   I.tx.forEach(t=>{const mc=I.map[t.cat];if(mc){(S.catmap=S.catmap||{})[t.cat]=mc;t.cat=mc}S.tx.push(t)});I.pacsNew.forEach(p=>{if(!S.pacs.includes(p))S.pacs.push(p)});
-  const A=n=>S.inv.find(a=>a.name.trim().toLowerCase()===n.trim().toLowerCase());
-  I.inv.forEach(o=>{let a=A(o.name);if(!a){a={id:uid(),name:o.name,kind:o.kind,pac:o.pac,ops:[],prices:[]};S.inv.push(a)}a.ops.push(o.op)});
-  I.prices.forEach(p=>{const a=A(p.name);if(a){a.prices=(a.prices||[]).filter(x=>x.date!==p.date);a.prices.push({date:p.date,price:p.price})}});
+  const get=(n,k,pac)=>{let a=S.inv.find(x=>nname(x.name)===nname(n)&&x.pac===pac);if(!a){a={id:uid(),name:n,kind:k,pac,ops:[],prices:[]};S.inv.push(a)}return a};
+  I.inv.forEach(o=>get(o.name,o.kind,o.pac).ops.push(o.op));
+  I.moves.forEach(m=>{m.from.ops=m.from.ops.filter(x=>x.id!==m.op.id);get(m.name,m.kind,m.pac).ops.push(m.op)});
+  I.prices.forEach(p=>{const a=S.inv.find(x=>nname(x.name)===nname(p.name));if(a){a.prices=(a.prices||[]).filter(x=>x.date!==p.date);a.prices.push({date:p.date,price:p.price})}});
   I.cash.forEach(c=>S.cash.push(c));
   const first={};I.nw.forEach(x=>{const k=x.sec+'|'+x.name.toLowerCase();if(!first[k]||x.m<first[k])first[k]=x.m});
   I.nw.forEach(x=>{
@@ -1011,15 +1014,15 @@ function impGo(){
     const sn=S.nws[x.m]||(S.nws[x.m]={v:{},fxi:{},rates:{tfrEH:26,tfrZX:26},saved:true});
     sn.v=sn.v||{};sn.fxi=sn.fxi||{};sn.v[it.id]=x.amt;if(x.fx)sn.fxi[it.id]=x.fx;sn.saved=true;
   });
-  save();impMsg=`Importati: ${I.tx.length} movimenti, ${I.inv.length} operazioni di investimento, ${I.cash.length} movimenti di liquidità, ${I.prices.length} prezzi, ${I.nw.length} valori di Net Worth ✔`;IMP=null;render();
+  save();impMsg=`Importati: ${I.tx.length} movimenti, ${I.inv.length} operazioni di investimento, ${I.cash.length} movimenti di liquidità, ${I.prices.length} prezzi, ${I.nw.length} valori di Net Worth${I.moves.length?', '+I.moves.length+' operazioni spostate nel PAC corretto':''} ✔`;IMP=null;render();
 }
 function impCard(){
-  const I=IMP,tot=I?I.tx.length+I.inv.length+I.cash.length+I.prices.length+I.nw.length:0,opts=sel=>`<option value="">Mantieni così</option>${GR.map(([n,l])=>`<optgroup label="${n}">${l.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`).join('')}<optgroup label="Entrate">${CI.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`;
+  const I=IMP,tot=I?I.tx.length+I.inv.length+I.cash.length+I.prices.length+I.nw.length+I.moves.length:0,opts=sel=>`<option value="">Mantieni così</option>${GR.map(([n,l])=>`<optgroup label="${n}">${l.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`).join('')}<optgroup label="Entrate">${CI.map(x=>`<option value="${esc(x)}" ${sel===x?'selected':''}>${esc(x)}</option>`).join('')}</optgroup>`;
   return `<div class="card"><h2 style="margin-top:0">📥 Importa / 📤 Esporta Excel</h2>
   <p class="mute">Importa dal modello Excel (Movimenti, Investimenti, Liquidità, Prezzi, NetWorth) anche con migliaia di righe: le righe già presenti vengono saltate. “Esporta” crea un file con tutti i tuoi dati, utile come archivio e riutilizzabile per importare.</p>
   <div class="row" style="gap:8px;justify-content:flex-start"><label class="chip" style="cursor:pointer">📂 Scegli file Excel/CSV<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="impFile(this.files[0])"></label><button class="ghost" onclick="expXlsx()">📤 Esporta tutto in Excel</button></div>
   ${impMsg?`<div style="margin-top:8px">${esc(impMsg)}</div>`:''}
-  ${I?`<div style="margin-top:10px"><b>Anteprima</b><div class="mute">Movimenti: <b>${I.tx.length}</b> · Investimenti: <b>${I.inv.length}</b> · Liquidità: <b>${I.cash.length}</b> · Prezzi: <b>${I.prices.length}</b> · Net Worth: <b>${I.nw.length}</b>${I.skip?` · già presenti (saltati): ${I.skip}`:''}</div>
+  ${I?`<div style="margin-top:10px"><b>Anteprima</b><div class="mute">Movimenti: <b>${I.tx.length}</b> · Investimenti: <b>${I.inv.length}</b> · Liquidità: <b>${I.cash.length}</b> · Prezzi: <b>${I.prices.length}</b> · Net Worth: <b>${I.nw.length}</b>${I.moves.length?` · <b>da spostare nel PAC corretto: ${I.moves.length}</b>`:''}${I.skip?` · già presenti (saltati): ${I.skip}`:''}</div>
   ${I.unkL.length?`<div style="margin-top:8px"><b>Categorie non riconosciute</b><div class="mute">Scegli a quale categoria assegnarle (ho preselezionato un suggerimento dove possibile).</div>${I.unkL.slice(0,40).map((k,i)=>`<div class="row" style="gap:8px;margin:6px 0"><span>${esc(k)} <span class="mute">(${I.unk[k]})</span></span><select style="width:55%;margin:0" onchange="IMP.map[IMP.unkL[${i}]]=this.value">${opts(I.map[k])}</select></div>`).join('')}${I.unkL.length>40?'<div class="mute">…altre non mostrate: restano come scritte.</div>':''}</div>`:''}
   ${I.errs.length?`<div class="out" style="margin-top:6px">${I.errs.length} righe non importabili:<br>${I.errs.slice(0,8).map(esc).join('<br>')}${I.errs.length>8?'<br>…':''}</div>`:''}
   <div class="row" style="gap:8px;margin-top:10px"><button style="flex:1" onclick="impGo()" ${tot?'':'disabled'}>Importa</button><button class="ghost" style="flex:1" onclick="IMP=null;render()">Annulla</button></div></div>`:''}</div>`;
@@ -1041,8 +1044,8 @@ async function expXlsx(){
   }catch(e){impMsg='Errore: '+e.message;render()}
 }
 function assetsFor(it){
-  const key=it.link?((S.inv.find(a=>a.id===it.link)||{name:it.link}).name):it.name,k=String(key).trim().toLowerCase();
-  return S.inv.filter(a=>a.name.trim().toLowerCase()===k);
+  const key=it.link?((S.inv.find(a=>a.id===it.link)||{name:it.link}).name):it.name,k=nname(key);
+  return S.inv.filter(a=>nname(a.name)===k);
 }
 function stockAuto(it,m){
   const end=m+'-31';
@@ -1088,6 +1091,9 @@ function privCard(){
   <div class="seg"><button class="${PV.style==='blur'?'on':''}" onclick="pvSet('style','blur')">Sfocato</button><button class="${PV.style==='ast'?'on':''}" onclick="pvSet('style','ast')">Asterischi ••••</button></div>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" style="width:auto;margin:0" ${PV.auto?'checked':''} onchange="pvSet('auto',this.checked)"> Parti sempre con gli importi nascosti</label></div>`;
 }
+function nname(s){let k=String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');if(k.startsWith('bit')&&k.length>5)k=k.slice(3);return k}
+function pacUsed(p){return S.inv.some(a=>a.pac===p)||S.cash.some(c=>c.pac===p)}
+function delPac(i){const p=S.pacs[i];if(pacUsed(p)){alert('Questo PAC contiene titoli o movimenti di liquidità: non si può eliminare.');return}if(confirm('Eliminare il PAC “'+p+'”?')){S.pacs.splice(i,1);save();render()}}
 const TABS=[['home','Riepilogo','🏠'],['add','Aggiungi','➕'],['list','Movimenti','📋'],['inv','Investimenti','📈'],['nw','Net Worth','💎'],['settings','Impost.','⚙️']];
 const go=k=>{tab=k;ed=null;if(k==='inv')iv={v:'list',id:null};render();scrollTo(0,0)};
 function render(){
